@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\CoreMinimal.h" />
+    <ClInclude Include="Source\Core\GameViewportClient.h" />
     <ClInclude Include="Source\EngineAPI.h" />
     <ClInclude Include="Source\Actor\Actor.h" />
     <ClInclude Include="Source\Actor\CubeActor.h" />
@@ -239,6 +240,7 @@
     <ClCompile Include="Source\Core\Engine.cpp" />
     <ClCompile Include="Source\Core\EngineLoop.cpp" />
     <ClCompile Include="Source\Core\GameEngine.cpp" />
+    <ClCompile Include="Source\Core\GameViewportClient.cpp" />
     <ClCompile Include="Source\Core\Paths.cpp" />
     <ClCompile Include="Source\Core\ShowFlags.cpp" />
     <ClCompile Include="Source\Core\Timer.cpp" />

@@ -46,14 +46,3 @@ protected:
 	/** 액터 목록을 순회하며 실제 드로우 커맨드로 바꾸는 공용 수집기다. */
 	FLevelRenderCollector RenderCollector;
 };
-
-class ENGINE_API FGameViewportClient : public IViewportClient
-{
-public:
-	/** 게임 뷰포트에 필요한 렌더러 콜백을 연결한다. */
-	void Attach(FEngine* Engine, FRenderer* Renderer) override;
-	/** 게임 뷰포트가 사용하던 렌더러 콜백을 해제한다. */
-	void Detach(FEngine* Engine, FRenderer* Renderer) override;
-	/** 활성 게임 월드를 기준으로 기본 렌더 패스를 실행한다. */
-	void Render(FEngine* Engine, FRenderer* Renderer) override;
-};

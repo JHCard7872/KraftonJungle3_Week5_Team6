@@ -13,6 +13,8 @@
 #include <Windows.h>
 #include <algorithm>
 #include <filesystem>
+
+#include "Actor/StaticMeshActor.h"
 #include "Component/StaticMeshComponent.h"
 #include "Asset/ObjManager.h"
 
@@ -123,7 +125,7 @@ void FEditorViewportAssetInteractionService::HandleFileDropOnViewport(
 
 	const FRay Ray = Picker.ScreenToRay(*Entry, ScreenMouseX, ScreenMouseY);
 
-	AActor* NewActor = Engine->GetLevel()->SpawnActor<AActor>("DroppedObjActor");
+	AActor* NewActor = Engine->GetLevel()->SpawnActor<AStaticMeshActor>("DroppedObjActor");
 	if (!NewActor)
 	{
 		return;

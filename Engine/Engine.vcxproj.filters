@@ -306,6 +306,7 @@
     <ClCompile Include="Source\World\World.cpp">
       <Filter>Source\World</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Core\GameViewportClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\CoreMinimal.h">
@@ -887,6 +888,7 @@
     <ClInclude Include="Source\Object\ObjectIterator.h">
       <Filter>Source\Object</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Core\GameViewportClient.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

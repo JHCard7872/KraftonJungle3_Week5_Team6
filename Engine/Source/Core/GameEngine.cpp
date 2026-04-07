@@ -1,6 +1,8 @@
 #include "GameEngine.h"
 
+#include "GameViewportClient.h"
 #include "ViewportClient.h"
+
 #include "World/World.h"
 
 bool FGameEngine::InitializeWorlds(int32 Width, int32 Height)
