@@ -6,7 +6,7 @@
 bool FGameEngine::InitializeWorlds(int32 Width, int32 Height)
 {
 	const float AspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
-	return CreateWorldContext("GameScene", EWorldType::Game, AspectRatio, true) != nullptr;
+	return CreateWorldContext("GameLevel", EWorldType::Game, AspectRatio, true) != nullptr;
 }
 
 std::unique_ptr<IViewportClient> FGameEngine::CreateViewportClient()

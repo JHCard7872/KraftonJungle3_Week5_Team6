@@ -1,4 +1,4 @@
-#include "Scene.h"
+#include "Level.h"
 
 #include "Core/Paths.h"
 #include "Actor/Actor.h"
@@ -16,9 +16,9 @@
 
 #include "Component/LineBatchComponent.h"
 
-IMPLEMENT_RTTI(UScene, UObject)
+IMPLEMENT_RTTI(ULevel, UObject)
 
-UScene::~UScene()
+ULevel::~ULevel()
 {
 	for (AActor* Actor : Actors)
 	{
@@ -33,24 +33,24 @@ UScene::~UScene()
 }
 
 
-FCamera* UScene::GetCamera() const
+FCamera* ULevel::GetCamera() const
 {
 	UWorld* World = GetTypedOuter<UWorld>();
 	return World ? World->GetCamera() : nullptr;
 }
 
-EWorldType UScene::GetWorldType() const
+EWorldType ULevel::GetWorldType() const
 {
 	UWorld* World = GetTypedOuter<UWorld>();
 	return World ? World->GetWorldType() : EWorldType::Game;
 }
 
-bool UScene::IsEditorScene() const
+bool ULevel::IsEditorLevel() const
 {
 	return GetWorldType() == EWorldType::Editor;
 }
 
-bool UScene::IsGameScene() const
+bool ULevel::IsGameLevel() const
 {
 	const EWorldType WorldType = GetWorldType();
 	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
@@ -58,7 +58,7 @@ bool UScene::IsGameScene() const
 
 
 
-void UScene::ClearActors()
+void ULevel::ClearActors()
 {
 
 
@@ -74,7 +74,7 @@ void UScene::ClearActors()
 	bBegunPlay = false;
 }
 
-void UScene::RegisterActor(AActor* InActor)
+void ULevel::RegisterActor(AActor* InActor)
 {
 	if (!InActor)
 	{
@@ -88,10 +88,10 @@ void UScene::RegisterActor(AActor* InActor)
 	}
 
 	Actors.push_back(InActor);
-	InActor->SetScene(this);
+	InActor->SetLevel(this);
 }
 
-void UScene::DestroyActor(AActor* InActor)
+void ULevel::DestroyActor(AActor* InActor)
 {
 	if (!InActor)
 	{
@@ -102,7 +102,7 @@ void UScene::DestroyActor(AActor* InActor)
 	InActor->Destroy();
 }
 
-void UScene::CleanupDestroyedActors()
+void ULevel::CleanupDestroyedActors()
 {
 	const auto NewEnd = std::ranges::remove_if(Actors,
 		[](const AActor* Actor)
@@ -113,7 +113,7 @@ void UScene::CleanupDestroyedActors()
 	Actors.erase(NewEnd, Actors.end());
 }
 
-void UScene::BeginPlay()
+void ULevel::BeginPlay()
 {
 	if (bBegunPlay)
 	{
@@ -131,7 +131,7 @@ void UScene::BeginPlay()
 	}
 }
 
-void UScene::Tick(float DeltaTime)
+void ULevel::Tick(float DeltaTime)
 {
 	if (!bBegunPlay)
 	{

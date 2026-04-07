@@ -7,20 +7,20 @@
 #include "Component/SceneComponent.h"
 #include "Debug/EngineLog.h"
 #include "Serializer/Archive.h"
-#include "Scene/Scene.h"
+#include "Scene/Level.h"
 IMPLEMENT_RTTI(AActor, UObject)
 
 namespace {
 	FVector GZeroVector{};
 }
 
-UScene* AActor::GetScene() const { return Scene; }
-void AActor::SetScene(UScene* InScene) { Scene = InScene; }
+ULevel* AActor::GetLevel() const { return Level; }
+void AActor::SetLevel(ULevel* InLevel) { Level = InLevel; }
 UWorld* AActor::GetWorld() const
 {
-	if (Scene)
+	if (Level)
 	{
-		return Scene->GetTypedOuter<UWorld>();
+		return Level->GetTypedOuter<UWorld>();
 	}
 	return nullptr;
 }
@@ -289,8 +289,8 @@ void AActor::Serialize(FArchive& Ar)
 			{
 				if (Comp != RootComponent && Comp->IsA(USceneComponent::StaticClass()))
 				{
-					USceneComponent* SceneComp = static_cast<USceneComponent*>(Comp);
-					SceneComp->AttachTo(RootComponent);
+					USceneComponent* LevelComp = static_cast<USceneComponent*>(Comp);
+					LevelComp->AttachTo(RootComponent);
 				}
 			}
 		}

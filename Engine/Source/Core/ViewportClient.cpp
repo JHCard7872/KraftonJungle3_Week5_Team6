@@ -5,7 +5,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderCommand.h"
 #include "Renderer/Material.h"
-#include "Scene/Scene.h"
+#include "Scene/Level.h"
 #include "Debug/EngineLog.h"
 #include "Component/UUIDBillboardComponent.h"
 #include "Component/SubUVComponent.h"
@@ -32,13 +32,13 @@ void IViewportClient::Tick(FEngine* Engine, float DeltaTime)
 	//}
 
 	//FInputManager* InputManager = Core->GetInputManager();
-	//UScene* Scene = ResolveScene(Core);
-	//if (!InputManager || !Scene)
+	//ULevel* Level = ResolveLevel(Core);
+	//if (!InputManager || !Level)
 	//{
 	//	return;
 	//}
 
-	//FCamera* Camera = Scene->GetCamera();
+	//FCamera* Camera = Level->GetCamera();
 	//if (!Camera)
 	//{
 	//	return;
@@ -63,9 +63,9 @@ void IViewportClient::HandleMessage(FEngine* Engine, HWND Hwnd, UINT Msg, WPARAM
 {
 }
 
-UScene* IViewportClient::ResolveScene(FEngine* Engine) const
+ULevel* IViewportClient::ResolveLevel(FEngine* Engine) const
 {
-	return Engine ? Engine->GetActiveScene() : nullptr;
+	return Engine ? Engine->GetActiveLevel() : nullptr;
 }
 
 UWorld* IViewportClient::ResolveWorld(FEngine* Engine) const
@@ -73,7 +73,7 @@ UWorld* IViewportClient::ResolveWorld(FEngine* Engine) const
 	return Engine ? Engine->GetActiveWorld() : nullptr;
 }
 
-void IViewportClient::BuildRenderCommands(FEngine* Engine, UScene* Scene, const FFrustum& Frustum, const FShowFlags& Flags, const FVector& CameraPosition, FRenderCommandQueue& OutQueue)
+void IViewportClient::BuildRenderCommands(FEngine* Engine, ULevel* Level, const FFrustum& Frustum, const FShowFlags& Flags, const FVector& CameraPosition, FRenderCommandQueue& OutQueue)
 {
 	UWorld* World = ResolveWorld(Engine);
 	if (!World) return;
@@ -121,8 +121,8 @@ void FGameViewportClient::Render(FEngine* Engine, FRenderer* Renderer)
 		return;
 	}
 
-	UScene* Scene = ResolveScene(Engine);
-	if (!Scene)
+	ULevel* Level = ResolveLevel(Engine);
+	if (!Level)
 	{
 		return;
 	}
@@ -148,7 +148,7 @@ void FGameViewportClient::Render(FEngine* Engine, FRenderer* Renderer)
 	Frustum.ExtractFromVP(Queue.ViewMatrix * Queue.ProjectionMatrix);
 
 	const FVector CameraPosition = Queue.ViewMatrix.GetInverse().GetTranslation();
-	BuildRenderCommands(Engine, Scene, Frustum, FShowFlags{}, CameraPosition, Queue);
+	BuildRenderCommands(Engine, Level, Frustum, FShowFlags{}, CameraPosition, Queue);
 	Renderer->SubmitCommands(Queue);
 	Renderer->ExecuteCommands();
 }

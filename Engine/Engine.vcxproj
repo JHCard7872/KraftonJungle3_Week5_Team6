@@ -103,8 +103,8 @@
     <ClInclude Include="Source\Renderer\TextureVertex.h" />
     <ClInclude Include="Source\Renderer\Vertex.h" />
     <ClInclude Include="Source\Scene\RenderCollector.h" />
-    <ClInclude Include="Source\Scene\Scene.h" />
-    <ClInclude Include="Source\Scene\SceneContext.h" />
+    <ClInclude Include="Source\Scene\Level.h" />
+    <ClInclude Include="Source\Scene\LevelContext.h" />
     <ClInclude Include="Source\Scene\WorldTypes.h" />
     <ClInclude Include="Source\Serializer\Archive.h" />
     <ClInclude Include="Source\Serializer\SceneSerializer.h" />
@@ -285,7 +285,7 @@
     <ClCompile Include="Source\Renderer\SubUVRenderer.cpp" />
     <ClCompile Include="Source\Renderer\TextMeshBuilder.cpp" />
     <ClCompile Include="Source\Scene\RenderCollector.cpp" />
-    <ClCompile Include="Source\Scene\Scene.cpp" />
+    <ClCompile Include="Source\Scene\Level.cpp" />
     <ClCompile Include="Source\Serializer\Archive.cpp" />
     <ClCompile Include="Source\Serializer\SceneSerializer.cpp" />
     <ClCompile Include="Source\Types\Name.cpp" />

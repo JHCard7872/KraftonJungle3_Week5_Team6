@@ -13,7 +13,7 @@
 #include "Core/Paths.h"
 #include "Object/ObjectFactory.h"
 #include "Platform/Windows/WindowsWindow.h"
-#include "Scene/Scene.h"
+#include "Scene/Level.h"
 #include "Viewport/Viewport.h"
 #include "Viewport/EditorViewportClient.h"
 #include "Viewport/PreviewViewportClient.h"
@@ -22,7 +22,7 @@
 
 namespace
 {
-	constexpr const char* PreviewSceneContextName = "PreviewScene";
+	constexpr const char* PreviewLevelContextName = "PreviewLevel";
 
 	const TArray<FWorldContext*>& GetEmptyPreviewWorldContexts()
 	{
@@ -30,14 +30,14 @@ namespace
 		return EmptyPreviewWorldContexts;
 	}
 
-	void InitializeDefaultPreviewScene(FEditorEngine* Engine)
+	void InitializeDefaultPreviewLevel(FEditorEngine* Engine)
 	{
 		if (Engine == nullptr)
 		{
 			return;
 		}
 
-		FWorldContext* PreviewContext = Engine->CreatePreviewWorldContext(PreviewSceneContextName, 1280, 720);
+		FWorldContext* PreviewContext = Engine->CreatePreviewWorldContext(PreviewLevelContextName, 1280, 720);
 		if (PreviewContext == nullptr || PreviewContext->World == nullptr)
 		{
 			return;
@@ -97,12 +97,12 @@ AActor* FEditorEngine::GetSelectedActor() const
 	return SelectionSubsystem.GetSelectedActor();
 }
 
-void FEditorEngine::ActivateEditorScene()
+void FEditorEngine::ActivateEditorLevel()
 {
 	ActiveEditorWorldContext = (EditorWorldContext && EditorWorldContext->World) ? EditorWorldContext : nullptr;
 }
 
-bool FEditorEngine::ActivatePreviewScene(const FString& ContextName)
+bool FEditorEngine::ActivatePreviewLevel(const FString& ContextName)
 {
 	FWorldContext* PreviewContext = FindPreviewWorld(ContextName);
 	if (PreviewContext == nullptr)
@@ -114,15 +114,15 @@ bool FEditorEngine::ActivatePreviewScene(const FString& ContextName)
 	return true;
 }
 
-UScene* FEditorEngine::GetEditorScene() const
+ULevel* FEditorEngine::GetEditorLevel() const
 {
-	return (EditorWorldContext && EditorWorldContext->World) ? EditorWorldContext->World->GetScene() : nullptr;
+	return (EditorWorldContext && EditorWorldContext->World) ? EditorWorldContext->World->GetLevel() : nullptr;
 }
 
-UScene* FEditorEngine::GetPreviewScene(const FString& ContextName) const
+ULevel* FEditorEngine::GetPreviewLevel(const FString& ContextName) const
 {
 	const FWorldContext* Context = FindPreviewWorld(ContextName);
-	return (Context && Context->World) ? Context->World->GetScene() : nullptr;
+	return (Context && Context->World) ? Context->World->GetLevel() : nullptr;
 }
 
 UWorld* FEditorEngine::GetEditorWorld() const
@@ -158,15 +158,15 @@ FWorldContext* FEditorEngine::CreatePreviewWorldContext(const FString& ContextNa
 	return PreviewContext;
 }
 
-UScene* FEditorEngine::GetScene() const
+ULevel* FEditorEngine::GetLevel() const
 {
-	return GetActiveScene();
+	return GetActiveLevel();
 }
 
-UScene* FEditorEngine::GetActiveScene() const
+ULevel* FEditorEngine::GetActiveLevel() const
 {
 	UWorld* ActiveWorld = GetActiveWorld();
-	return ActiveWorld ? ActiveWorld->GetScene() : nullptr;
+	return ActiveWorld ? ActiveWorld->GetLevel() : nullptr;
 }
 
 UWorld* FEditorEngine::GetActiveWorld() const
@@ -255,7 +255,7 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 {
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
-	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetScene(), DeltaTime);
+	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetLevel(), DeltaTime);
 }
 
 void FEditorEngine::TickWorlds(float DeltaTime)
@@ -334,8 +334,8 @@ void FEditorEngine::CreateInitUI()
 bool FEditorEngine::InitEditorPreview()
 {
 	// 에디터가 항상 접근 가능한 기본 프리뷰 월드와 프리뷰 뷰포트를 준비한다.
-	InitializeDefaultPreviewScene(this);
-	PreviewViewportClient = std::make_unique<FPreviewViewportClient>(EditorUI, PreviewSceneContextName);
+	InitializeDefaultPreviewLevel(this);
+	PreviewViewportClient = std::make_unique<FPreviewViewportClient>(EditorUI, PreviewLevelContextName);
 	return PreviewViewportClient != nullptr;
 }
 
@@ -406,13 +406,13 @@ bool FEditorEngine::InitEditorWorlds(int32 Width, int32 Height)
 		? (static_cast<float>(Width) / static_cast<float>(Height))
 		: 1.0f;
 
-	EditorWorldContext = CreateWorldContext("EditorScene", EWorldType::Editor, AspectRatio, true);
+	EditorWorldContext = CreateWorldContext("EditorLevel", EWorldType::Editor, AspectRatio, true);
 	if (!EditorWorldContext)
 	{
 		return false;
 	}
 
-	ActivateEditorScene();
+	ActivateEditorLevel();
 	return true;
 }
 
@@ -520,8 +520,8 @@ void FEditorEngine::SyncViewportClient()
 	}
 
 	IViewportClient* TargetViewportClient = ViewportClient.get();
-	const FWorldContext* ActiveSceneContext = GetActiveWorldContext();
-	if (ActiveSceneContext && ActiveSceneContext->WorldType == EWorldType::Preview && PreviewViewportClient)
+	const FWorldContext* ActiveLevelContext = GetActiveWorldContext();
+	if (ActiveLevelContext && ActiveLevelContext->WorldType == EWorldType::Preview && PreviewViewportClient)
 	{
 		TargetViewportClient = PreviewViewportClient.get();
 	}

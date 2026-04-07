@@ -79,6 +79,9 @@
     <Filter Include="ThirdParty\nlohmann">
       <UniqueIdentifier>{c70e54eb-75c7-d408-4bdc-b003f49af18a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Level">
+      <UniqueIdentifier>{314211da-25ae-4d91-b0e4-1a5e3bea05af}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Actor\Actor.cpp">
@@ -291,7 +294,7 @@
     <ClCompile Include="Source\Scene\RenderCollector.cpp">
       <Filter>Source\Scene</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scene\Scene.cpp">
+    <ClCompile Include="Source\Scene\Level.cpp">
       <Filter>Source\Scene</Filter>
     </ClCompile>
     <ClCompile Include="Source\Serializer\Archive.cpp">
@@ -557,10 +560,10 @@
     <ClInclude Include="Source\Scene\RenderCollector.h">
       <Filter>Source\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\Scene.h">
+    <ClInclude Include="Source\Scene\Level.h">
       <Filter>Source\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scene\SceneContext.h">
+    <ClInclude Include="Source\Scene\LevelContext.h">
       <Filter>Source\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Source\Scene\WorldTypes.h">
