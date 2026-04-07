@@ -25,20 +25,3 @@ void ASkySphereActor::PostSpawnInitialize()
 
 	AActor::PostSpawnInitialize();
 }
-
-void ASkySphereActor::FixupReferences(const FDuplicateionContext& Context)
-{
-	AActor::FixupReferences(Context);
-	if (this->SkySphereComponent)
-	{
-		this->SkySphereComponent = static_cast<UStaticMeshComponent*>(Context.GetMappedObject(this->SkySphereComponent));
-	}
-}
-
-void ASkySphereActor::CopyPropertiesFrom(const UObject* Source)
-{
-	AActor::CopyPropertiesFrom(Source);
-	const ASkySphereActor* SourceActor = static_cast<const APlaneActor*>(Source);
-
-	this->SkySphereComponent = SourceActor->SkySphereComponent;
-}

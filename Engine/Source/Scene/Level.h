@@ -64,6 +64,7 @@ public:
 
 
 protected:
+	void CopyPropertiesFrom(const UObject* Source) override;
 	void DuplicateSubObjects(FDuplicateionContext& Context) override;
 
 private:

@@ -878,6 +878,35 @@ void FEditorUI::Render()
 			}
 			ImGui::EndMenu();
 		}
+
+		// PIE Play/Stop Button
+		if (Engine)
+		{
+			bool bIsPlaying = Engine->IsPlayingInEditor();
+			const char* ButtonLabel = bIsPlaying ? "Stop" : "Play";
+			ImVec4 ButtonColor = bIsPlaying ? ImVec4(0.8f, 0.2f, 0.2f, 1.0f) : ImVec4(0.2f, 0.7f, 0.2f, 1.0f);
+			ImVec4 ButtonHoverColor = bIsPlaying ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) : ImVec4(0.3f, 0.9f, 0.3f, 1.0f);
+
+			float MenuBarWidth = ImGui::GetWindowWidth();
+			float ButtonWidth = 60.0f;
+			ImGui::SetCursorPosX((MenuBarWidth - ButtonWidth) * 0.5f);
+
+			ImGui::PushStyleColor(ImGuiCol_Button, ButtonColor);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ButtonHoverColor);
+			if (ImGui::Button(ButtonLabel, ImVec2(ButtonWidth, 0)))
+			{
+				if (bIsPlaying)
+				{
+					Engine->EndPIE();
+				}
+				else
+				{
+					Engine->StartPIE();
+				}
+			}
+			ImGui::PopStyleColor(2);
+		}
+
 		ImGui::EndMainMenuBar();
 	}
 
