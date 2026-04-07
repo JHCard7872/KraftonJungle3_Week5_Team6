@@ -69,6 +69,57 @@ namespace
 
 FEditorEngine::~FEditorEngine() = default;
 
+void FEditorEngine::StartPIE()
+{
+	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World) return;
+
+	UE_LOG("[PIE] Starting Play in Editor...");
+
+	FDuplicateionContext Context;
+	UWorld* EditorWorld = EditorWorldContext->World;
+
+	UWorld* PIEWorld = static_cast<UWorld*>(EditorWorld->Duplicate(Context, nullptr));
+	PIEWorld->FixupReferences(Context);
+
+	float AspectRatio = MainWindow ? (static_cast<float>(MainWindow->GetWidth()) / static_cast<float>(MainWindow->GetHeight())) : 1.0f;
+
+	PIEWorldContext = CreateWorldContext("PIELevel", EWorldType::PIE, AspectRatio, false);
+
+	if (PIEWorldContext->World && PIEWorldContext->World != PIEWorld)
+	{
+		PIEWorldContext->World = PIEWorld;
+	}
+
+	ActiveEditorWorldContext = PIEWorldContext;
+
+	PIEWorld->BeginPlay();
+	SyncViewportClient();
+}
+
+void FEditorEngine::EndPIE()
+{
+	if (!IsPlayingInEditor()) return;
+
+	UE_LOG("[PIE] Stoppinig Play In Editor...");
+
+	if (PIEWorldContext && PIEWorldContext->World)
+	{
+		// PIEWorldContext->World->EndPlay();
+		// PIEWorldContext->World->Destroy();
+	}
+
+	ActiveEditorWorldContext = EditorWorldContext;
+
+	if (PIEWorldContext)
+	{
+		DestroyWorldContext(PIEWorldContext);
+		PIEWorldContext = nullptr;
+	}
+
+	SyncViewportClient();
+	SyncFocusedViewportLocalState();
+}
+
 void FEditorEngine::Shutdown()
 {
 	FEngineLog::Get().SetCallback({});

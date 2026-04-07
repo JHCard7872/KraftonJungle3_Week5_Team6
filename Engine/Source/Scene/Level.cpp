@@ -148,3 +148,20 @@ void ULevel::Tick(float DeltaTime)
 
 	CleanupDestroyedActors();
 }
+
+void ULevel::DuplicateSubObjects(FDuplicateionContext& Context)
+{
+	UObject::DuplicateSubObjects(Context);
+
+	TArray<AActor*> OldActors = this->Actors;
+	this->Actors.clear();
+
+	for (AActor* OldActor : OldActors)
+	{
+		if (OldActor)
+		{
+			AActor* NewActor = static_cast<AActor*>(OldActor->Duplicate(Context, this));
+			this->RegisterActor(NewActor);
+		}
+	}
+}

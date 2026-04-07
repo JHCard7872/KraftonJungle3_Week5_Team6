@@ -63,6 +63,12 @@ public:
 	float GetWorldTime() const { return WorldTime; }
 	float GetDeltaTime() const { return DeltaSeconds; }
 
+	void FixupReferences(const FDuplicateionContext& Context) override;
+
+protected:
+	void CopyPropertiesFrom(const UObject* Source) override;
+	void DuplicateSubObjects(FDuplicateionContext& Context) override;
+
 private:
 	ULevel* PersistentLevel = nullptr;
 	TArray<ULevel*> StreamingLevels;

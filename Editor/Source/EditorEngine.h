@@ -18,6 +18,10 @@ public:
 	FEditorEngine() = default;
 	~FEditorEngine() override;
 
+	void StartPIE();
+	void EndPIE();
+	bool IsPlayingInEditor() const { return PIEWorldContext != nullptr; }
+
 	void Shutdown() override;
 	void SetSelectedActor(AActor* InActor);
 	AActor* GetSelectedActor() const;
@@ -84,6 +88,7 @@ private:
 	FEditorSelectionSubsystem SelectionSubsystem;
 	FEditorCameraSubsystem CameraSubsystem;
 	FWorldContext* EditorWorldContext = nullptr;
+	FWorldContext* PIEWorldContext = nullptr;
 	TArray<FWorldContext*> PreviewWorldContexts;
 	FWorldContext* ActiveEditorWorldContext = nullptr;
 

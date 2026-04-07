@@ -102,6 +102,61 @@ void UWorld::CleanupWorld()
 	DeltaSeconds = 0.f;
 }
 
+void UWorld::FixupReferences(const FDuplicateionContext& Context)
+{
+	UObject::FixupReferences(Context);
+
+	if (this->ActiveCameraComponent)
+	{
+		this->ActiveCameraComponent = static_cast<UCameraComponent*>(Context.GetMappedObject(this->ActiveCameraComponent));
+	}
+}
+
+void UWorld::CopyPropertiesFrom(const UObject* Source)
+{
+	UObject::CopyPropertiesFrom(Source);
+	const UWorld* SourceWorld = static_cast<const UWorld*>(Source);
+
+	// 단순 변수 얕은 복사
+	this->WorldTime = SourceWorld->WorldTime;
+	this->DeltaSeconds = SourceWorld->DeltaSeconds;
+	this->WorldType = SourceWorld->WorldType;
+	this->bBegunPlay = SourceWorld->bBegunPlay;
+
+	// 포인터/배열들 우선 얕은 복사 -> DuplicateSubObjects와 Fixup에서 수리 예정.
+	this->PersistentLevel = SourceWorld->PersistentLevel;
+	this->StreamingLevels = SourceWorld->StreamingLevels;
+	this->LevelCameraComponent = SourceWorld->LevelCameraComponent;
+	this->ActiveCameraComponent = SourceWorld->ActiveCameraComponent;
+}
+
+void UWorld::DuplicateSubObjects(FDuplicateionContext& Context)
+{
+	UObject::DuplicateSubObjects(Context);
+
+	if (this->PersistentLevel)
+	{
+		this->PersistentLevel = static_cast<ULevel*>(this->PersistentLevel->Duplicate(Context, this)); // 복사본 주고, PersistentLevel에서도 Duplicate수행하게 해줌.
+	}
+
+	TArray<ULevel*> OldStreamingLevels = this->StreamingLevels;
+	this->StreamingLevels.clear();
+
+	for (ULevel* OldLevel : OldStreamingLevels)
+	{
+		if (OldLevel)
+		{
+			ULevel* NewLevel = static_cast<ULevel*>(OldLevel->Duplicate(Context, this));
+			this->StreamingLevels.push_back(NewLevel);
+		}
+	}
+
+	if(this->LevelCameraComponent)
+	{
+		this->LevelCameraComponent = static_cast<UCameraComponent*>(Context.GetMappedObject(this->LevelCameraComponent));
+	}
+}
+
 void UWorld::DestroyActor(AActor* InActor)
 {
 	if (!InActor || !PersistentLevel) return;

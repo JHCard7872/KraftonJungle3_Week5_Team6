@@ -75,6 +75,11 @@ public:
 	bool IsVisible() const { return bVisible; }
 	void SetVisible(bool bInVisible) { bVisible = bInVisible; }
 
+	void FixupReferences(const FDuplicateionContext& Context) override;
+protected:
+	void CopyPropertiesFrom(const UObject* Source) override;
+	void DuplicateSubObjects(FDuplicateionContext& Context) override;
+
 protected:
 	TObjectPtr<ULevel> Level;
 	//ULevel* Level = nullptr;

@@ -129,9 +129,6 @@
     <ClCompile Include="Source\Component\PrimitiveComponent.cpp">
       <Filter>Source\Component</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Component\RandomColorComponent.cpp">
-      <Filter>Source\Component</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Component\SceneComponent.cpp">
       <Filter>Source\Component</Filter>
     </ClCompile>
@@ -360,9 +357,6 @@
       <Filter>Source\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Component\PrimitiveComponent.h">
-      <Filter>Source\Component</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Component\RandomColorComponent.h">
       <Filter>Source\Component</Filter>
     </ClInclude>
     <ClInclude Include="Source\Component\SceneComponent.h">
@@ -890,7 +884,9 @@
     <ClInclude Include="ThirdParty\nlohmann\json.hpp">
       <Filter>ThirdParty\nlohmann</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Object\ObjectIterator.h" />
+    <ClInclude Include="Source\Object\ObjectIterator.h">
+      <Filter>Source\Object</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

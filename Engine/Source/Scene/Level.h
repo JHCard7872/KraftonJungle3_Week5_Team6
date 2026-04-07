@@ -62,6 +62,10 @@ public:
 	/** 씬 안의 액터를 순회하며 Tick하고, 끝나면 파괴 대상을 정리한다. */
 	void Tick(float DeltaTime);
 
+
+protected:
+	void DuplicateSubObjects(FDuplicateionContext& Context) override;
+
 private:
 	TArray<AActor*> Actors;
 	bool bBegunPlay = false;
