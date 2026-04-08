@@ -74,7 +74,7 @@ public:
 	void AddOverlayWidget(SWidget* W) { OverlayWidgets.push_back(W); }
 	void Paint(SWidget& Painter);
 
-	void ProcessMouseDown(int32 X, int32 Y);
+	bool ProcessMouseDown(int32 X, int32 Y);
 	void ProcessMouseDoubleClick(int32 X, int32 Y);
 	void ProcessMouseMove(int32 X, int32 Y);
 	void ProcessMouseUp(int32 X, int32 Y);

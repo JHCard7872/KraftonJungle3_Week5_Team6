@@ -31,27 +31,23 @@ void FEditorViewportInputService::TickCameraNavigation(
 		return;
 	}
 
-	bool bIsPlaying = EditorEngine->IsPlayingInEditor();
 	FInputManager* Input = Engine->GetInputManager();
-	bool bRightMouseDown = Input && Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+	if (!Input || Gizmo.IsDragging()) return;
 
-	if (ImGui::GetCurrentContext() && !bIsPlaying && !bRightMouseDown)
+	bool bIsCaptured = Input->IsMouseCaptured();
+	bool bRightMouseDown = Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+
+	// 1. Possessed 상태(마우스 캡처 중)라면 에디터 회전 로직은 작동하지 않음 (TickPIECamera가 처리)
+	if (bIsCaptured) return;
+
+	// 2. Ejected 상태(마우스 해제)라면 반드시 뷰포트에 포커스가 있고 우클릭 중일 때만 허용
+	if (Slate->GetFocusedViewportId() == INVALID_VIEWPORT_ID || !bRightMouseDown) return;
+
+	// 3. ImGui 점유 체크 (우클릭 중일 때는 조작권을 우선함)
+	if (ImGui::GetCurrentContext() && !bRightMouseDown)
 	{
 		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse)
-		{
-			return;
-		}
-	}
-
-	if (!Input || Gizmo.IsDragging())
-	{
-		return;
-	}
-
-	if (!bIsPlaying && !bRightMouseDown)
-	{
-		return;
+		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse) return;
 	}
 
 	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetFocusedViewportId());
@@ -186,28 +182,13 @@ void FEditorViewportInputService::HandleMessage(
 	{
 	case WM_LBUTTONDOWN:
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// PIE 모드일 때 실제 뷰포트 영역(Slate Area) 내부를 클릭했을 때만 마우스 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
-		{
-			if (FInputManager* Input = Engine->GetInputManager())
-			{
-				Input->SetMouseCapture(true);
-			}
-		}
+		// 좌클릭 시 자동 캡처 로직 제거 (오직 F8로만 제어)
 		break;
 	case WM_LBUTTONDBLCLK:
 		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
 		return;
 	case WM_RBUTTONDOWN:
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// 우클릭 시에도 동일하게 뷰포트 영역 내부인지 확인 후 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
-		{
-			if (FInputManager* Input = Engine->GetInputManager())
-			{
-				Input->SetMouseCapture(true);
-			}
-		}
 		break;
 	case WM_MOUSEMOVE:
 		Slate->ProcessMouseMove(MouseX, MouseY);
