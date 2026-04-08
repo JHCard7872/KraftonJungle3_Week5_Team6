@@ -150,29 +150,33 @@ void FEditorViewportInputService::HandleMessage(
 	{
 		return;
 	}
+// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
+if (ImGui::GetCurrentContext())
+{
+	const ImGuiIO& IO = ImGui::GetIO();
 
-	// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
-	if (ImGui::GetCurrentContext())
+	// [중요] 마우스가 캡처된 Possessed 상태라면 ImGui의 간섭을 완전히 차단함
+	FInputManager* Input = Engine->GetInputManager();
+	bool bIsCaptured = Input && Input->IsMouseCaptured();
+
+	if (IO.WantCaptureMouse && !bIsCaptured)
 	{
-		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureMouse)
+		// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
+		if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
 		{
-			// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
-			if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
+			if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
 			{
-				if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
-				{
-					Slate->ClearFocus();
-					return;
-				}
-				
-				if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
-				{
-					return;
-				}
+				Slate->ClearFocus();
+				return;
+			}
+
+			if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
+			{
+				return;
 			}
 		}
 	}
+}
 
 	const int32 MouseX = static_cast<int32>(static_cast<short>(LOWORD(LParam)));
 	const int32 MouseY = static_cast<int32>(static_cast<short>(HIWORD(LParam)));
