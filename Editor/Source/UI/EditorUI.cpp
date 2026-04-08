@@ -294,7 +294,7 @@ void FEditorUI::AttachToRenderer(FRenderer* InRenderer)
 			}
 	
 			AActor* Selected = Engine->GetSelectedActor();
-			if (Selected && !Selected->IsPendingDestroy() && Selected->IsVisible()
+			if (Selected && Selected->GetLevel() == Renderer->GetCurrentRenderingLevel() && !Selected->IsPendingDestroy() && Selected->IsVisible()
 				&& Selected->GetComponentByClass<USkyComponent>() == nullptr
 				&& [&]() -> bool {
 				const FEditorViewportRegistry& ViewportRegistry = Engine->GetViewportRegistry();
@@ -911,7 +911,7 @@ void FEditorUI::Render()
 			{
 				if (bIsPlaying)
 				{
-					Engine->EndPIE();
+					Engine->RequestEndPIE();
 				}
 				else
 				{

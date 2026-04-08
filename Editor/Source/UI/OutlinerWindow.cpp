@@ -20,7 +20,7 @@ void FOutlinerWindow::Render(FEditorEngine* Engine)
 		ImGui::End();
 		return;
 	}
-	if (!Engine || !Engine->GetLevel())
+	if (!Engine || !Engine->GetEditorLevel())
 	{
 		ImGui::End();
 		return;
@@ -31,7 +31,7 @@ void FOutlinerWindow::Render(FEditorEngine* Engine)
 
 	ImGui::SeparatorText("Actors");
 
-	ULevel* Level = Engine->GetLevel();
+	ULevel* Level = Engine->GetEditorLevel();
 	const TArray<AActor*>& Actors = Level->GetActors();
 	
 

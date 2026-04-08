@@ -59,6 +59,12 @@ void FEditorViewportInputService::TickCameraNavigation(
 	const float DeltaX = Input->GetMouseDeltaX();
 	const float DeltaY = Input->GetMouseDeltaY();
 
+	// [수정]: PIE 캡처가 일어난 직후 프레임에는 튐 방지를 위해 델타값을 무시한다.
+	if (EditorEngine->IsPIEJustCaptured())
+	{
+		return;
+	}
+
 	if (FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
 	{
 		float Sensitivity = 0.2f;
@@ -150,48 +156,104 @@ void FEditorViewportInputService::HandleMessage(
 	{
 		return;
 	}
-// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
-if (ImGui::GetCurrentContext())
-{
-	const ImGuiIO& IO = ImGui::GetIO();
 
-	// [중요] 마우스가 캡처된 Possessed 상태라면 ImGui의 간섭을 완전히 차단함
-	FInputManager* Input = Engine->GetInputManager();
-	bool bIsCaptured = Input && Input->IsMouseCaptured();
-
-	if (IO.WantCaptureMouse && !bIsCaptured)
+	// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
+	if (ImGui::GetCurrentContext())
 	{
-		// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
-		if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
-		{
-			if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
-			{
-				Slate->ClearFocus();
-				return;
-			}
+		const ImGuiIO& IO = ImGui::GetIO();
 
-			if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
+		// [중요] 마우스가 캡처된 Possessed 상태라면 ImGui의 간섭을 완전히 차단함
+		FInputManager* Input = Engine->GetInputManager();
+		bool bIsCaptured = Input && Input->IsMouseCaptured();
+
+		if (IO.WantCaptureMouse && !bIsCaptured)
+		{
+			// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
+			if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
 			{
-				return;
+				if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
+				{
+					Slate->ClearFocus();
+					return;
+				}
+
+				if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
+				{
+					return;
+				}
 			}
 		}
 	}
-}
 
 	const int32 MouseX = static_cast<int32>(static_cast<short>(LOWORD(LParam)));
 	const int32 MouseY = static_cast<int32>(static_cast<short>(HIWORD(LParam)));
 
+	const bool bIsPlaying = EditorEngine->IsPlayingInEditor();
+	FInputManager* Input = Engine->GetInputManager();
+	const bool bIsCaptured = Input && Input->IsMouseCaptured();
+	const FViewportId PIEViewportId = EditorEngine->GetPIEViewportId();
+
+	// [수정] 마우스가 캡처된 상태라면 슬레이트 및 에디터 모든 상호작용 차단 (포커스 변경 방지)
+	if (bIsPlaying && bIsCaptured)
+	{
+		if (Msg >= WM_MOUSEFIRST && Msg <= WM_MOUSELAST)
+		{
+			return;
+		}
+	}
+
 	switch (Msg)
 	{
 	case WM_LBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+	{
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// [언리얼 표준]: 클릭 시 자동 포제션 제거 (오직 F8로만 전환)
+		// PIE 모드일 때 실제 뷰포트 영역(Slate Area) 내부를 클릭했을 때만 마우스 캡처
+		if (bIsPlaying && Slate->GetIsCoursorInArea())
+		{
+			// 현재 어느 뷰포트가 PIE용인지 판별
+			FViewportId TargetPIEId = INVALID_VIEWPORT_ID;
+			FViewportId FocusedId = Slate->GetFocusedViewportId();
+			FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+			if (FocusedEntry && FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
+			{
+				TargetPIEId = FocusedId;
+			}
+			else
+			{
+				FViewportEntry* PerspEntry = ViewportRegistry.FindEntryByType(EViewportType::Perspective);
+				if (PerspEntry) TargetPIEId = PerspEntry->Id;
+			}
+
+			// 클릭한 지점이 해당 PIE 뷰포트의 영역 내부인지 최종 확인
+			FViewport* PIEViewport = ViewportRegistry.GetViewportById(TargetPIEId);
+			if (PIEViewport)
+			{
+				const FRect& Rect = PIEViewport->GetRect();
+				if (MouseX >= Rect.X && MouseX < (Rect.X + Rect.Width) &&
+					MouseY >= Rect.Y && MouseY < (Rect.Y + Rect.Height))
+				{
+					if (Input)
+					{
+						EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지 플래그 설정
+						Input->SetMouseCapture(true);
+						
+						POINT Center = { PIEViewport->GetRect().X + PIEViewport->GetRect().Width / 2, PIEViewport->GetRect().Y + PIEViewport->GetRect().Height / 2 };
+						::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
+						::SetCursorPos(Center.x, Center.y);
+						
+						// [중요]: 위치 강제 이동 직후 델타값을 즉시 날려서 다음 프레임에서 거대한 이동량이 계산되지 않도록 함
+						Input->ResetMouseDelta();
+						
+						UE_LOG("[PIE] Re-captured (Possessed)");
+					}
+				}
+			}
+		}
 		break;
+	}
 	case WM_LBUTTONDBLCLK:
 		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
-		return;
-	case WM_RBUTTONDOWN:
-		Slate->ProcessMouseDown(MouseX, MouseY);
 		break;
 	case WM_MOUSEMOVE:
 		Slate->ProcessMouseMove(MouseX, MouseY);
@@ -227,16 +289,26 @@ if (ImGui::GetCurrentContext())
 		return;
 	}
 
-	ULevel* Level = Engine->GetLevel();
-	AActor* SelectedActor = EditorEngine->GetSelectedActor();
-	if (!Level)
-	{
-		return;
-	}
+	const bool bRightMouseDown = Input && Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
 
-	const bool bRightMouseDown = Engine->GetInputManager() &&
-		Engine->GetInputManager()->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
-	FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(Slate->GetFocusedViewportId());
+	auto GetLevelForViewport = [&](FViewportId ViewportId) -> ULevel*
+	{
+		if (bIsPlaying)
+		{
+			// [분할 PIE 복구]: PIE 메인 뷰포트 클릭 시에는 PIE 레벨을, 나머지는 에디터 레벨을 반환
+			if (ViewportId == PIEViewportId)
+			{
+				return EditorEngine->GetActiveLevel();
+			}
+			else
+			{
+				return EditorEngine->GetEditorLevel();
+			}
+		}
+		return EditorEngine->GetActiveLevel();
+	};
+
+	AActor* SelectedActor = EditorEngine->GetSelectedActor();
 
 	switch (Msg)
 	{
@@ -260,9 +332,20 @@ if (ImGui::GetCurrentContext())
 
 	case WM_LBUTTONDOWN:
 	{
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetFocusedViewportId());
-		if (!Viewport) return;
+		FViewportId FocusedId = Slate->GetFocusedViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(FocusedId);
+		if (!Viewport)
+		{
+			return;
+		}
 
+		ULevel* Level = GetLevelForViewport(FocusedId);
+		if (!Level)
+		{
+			return;
+		}
+
+		FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(FocusedId);
 		const FRect& Rect = Viewport->GetRect();
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
@@ -280,14 +363,21 @@ if (ImGui::GetCurrentContext())
 
 	case WM_MOUSEMOVE:
 	{
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
+		FViewportId HoveredId = Slate->GetHoveredViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(HoveredId);
 		if (!Viewport)
 		{
 			Gizmo.ClearHover();
 			return;
 		}
 
-		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
+		ULevel* Level = GetLevelForViewport(HoveredId);
+		if (!Level)
+		{
+			return;
+		}
+
+		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 		const FRect& Rect = Viewport->GetRect();
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
@@ -310,10 +400,11 @@ if (ImGui::GetCurrentContext())
 		if (!Gizmo.IsDragging()) return;
 
 		Gizmo.EndDrag();
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
+		FViewportId HoveredId = Slate->GetHoveredViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(HoveredId);
 		if (Viewport)
 		{
-			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
+			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 			const FRect& Rect = Viewport->GetRect();
 			ScreenMouseX = MouseX - Rect.X;
 			ScreenMouseY = MouseY - Rect.Y;

@@ -762,15 +762,45 @@ public:
 			return MakeTranslation(Position);
 		}
 
-		const FVector Right = FVector::CrossProduct(Up, Forward).GetSafeNormal();
+		FVector Right = FVector::CrossProduct(Up, Forward).GetSafeNormal();
 		if (Right.IsNearlyZero())
 		{
-			return MakeTranslation(Position);
+			// Up과 Forward가 평행한 경우 (카메라가 수직으로 위/아래를 볼 때)
+			// 다른 Up 후보를 사용하여 Right 벡터를 계산함
+			const FVector NewUp = (std::abs(Forward.Z) < 0.999f) ? FVector::UpVector : FVector::ForwardVector;
+			Right = FVector::CrossProduct(NewUp, Forward).GetSafeNormal();
 		}
 
 		const FVector NewUp = FVector::CrossProduct(Forward, Right).GetSafeNormal();
 		return FMatrix(
 			Forward.X, Forward.Y, Forward.Z, 0.f,
+			-Right.X, -Right.Y, -Right.Z, 0.f,
+			NewUp.X, NewUp.Y, NewUp.Z, 0.f,
+			Position.X, Position.Y, Position.Z, 1.f
+		);
+	}
+
+	// 지정한 위치에서 특정 방향(보통 카메라 반대 방향)을 바라보는 Billboard 행렬을 생성함
+	// Orthographic 뷰포트 등에서 위치 차이가 아니라 카메라의 고정된 Forward를 써야 할 때 유용함
+	static FMatrix MakeBillboardFromForward(const FVector& Position, const FVector& Forward, const FVector& Up = FVector::UpVector) noexcept
+	{
+		const FVector F = -Forward.GetSafeNormal();
+		if (F.IsNearlyZero())
+		{
+			return MakeTranslation(Position);
+		}
+
+		FVector Right = FVector::CrossProduct(Up, F).GetSafeNormal();
+		if (Right.IsNearlyZero())
+		{
+			// Up과 F가 평행한 경우 (Top/Bottom 뷰포트)
+			const FVector NewUp = (std::abs(F.Z) < 0.999f) ? FVector::UpVector : FVector::ForwardVector;
+			Right = FVector::CrossProduct(NewUp, F).GetSafeNormal();
+		}
+
+		const FVector NewUp = FVector::CrossProduct(F, Right).GetSafeNormal();
+		return FMatrix(
+			F.X, F.Y, F.Z, 0.f,
 			-Right.X, -Right.Y, -Right.Z, 0.f,
 			NewUp.X, NewUp.Y, NewUp.Z, 0.f,
 			Position.X, Position.Y, Position.Z, 1.f

@@ -9,10 +9,12 @@
 #include "Renderer/Material.h"
 #include "Renderer/Renderer.h"
 #include "Scene/Level.h"
+#include "Camera/Camera.h"
 #include "UI/EditorUI.h"
 #include "Viewport/BlitRenderer.h"
 #include "Viewport/Viewport.h"
 #include "Component/SkyComponent.h"
+#include "Component/CameraComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Asset/ObjManager.h"
 #include "Slate/Widget/Painter.h"
@@ -71,6 +73,8 @@ void FEditorViewportRenderService::RenderAll(
 	constexpr float ClearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
 	const TArray<FViewportEntry>& Entries = ViewportRegistry.GetEntries();
 
+	const FViewportId PIEViewportId = EditorEngine->GetPIEViewportId();
+
 	for (const FViewportEntry& Entry : Entries)
 	{
 		if (!Entry.bActive || !Entry.Viewport)
@@ -99,21 +103,78 @@ void FEditorViewportRenderService::RenderAll(
 		Context->ClearRenderTargetView(RTV, ClearColor);
 		Context->ClearDepthStencilView(DSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
+		ULevel* TargetLevel = Engine->GetLevel();
+		bool bUseGameCamera = false;
+
+		if (EditorEngine->IsPlayingInEditor())
+		{
+			// [분할 PIE 복구]: PIE용 뷰포트만 라이브 레벨을 사용하고, 나머지는 에디터 레벨(정지)을 사용
+			if (Entry.Id == PIEViewportId)
+			{
+				TargetLevel = EditorEngine->GetActiveLevel(); // PIE 라이브 레벨
+				bUseGameCamera = true;
+			}
+			else
+			{
+				TargetLevel = EditorEngine->GetEditorLevel(); // 에디터 정지 레벨
+			}
+		}
+
+		Renderer->SetCurrentRenderingLevel(TargetLevel);
 		Renderer->BeginLevelPass(RTV, DSV, Viewport);
 
 		const float AspectRatio = static_cast<float>(Rect.Width) / static_cast<float>(Rect.Height);
 		FRenderCommandQueue Queue;
 		Queue.Reserve(Renderer->GetPrevCommandCount());
-		Queue.ProjectionMatrix = Entry.LocalState.BuildProjMatrix(AspectRatio);
-		Queue.ViewMatrix = Entry.LocalState.BuildViewMatrix();
+
+		if (bUseGameCamera)
+		{
+			UWorld* PIEWorld = EditorEngine->GetActiveWorld();
+			if (PIEWorld && PIEWorld->GetActiveCameraComponent() && PIEWorld->GetActiveCameraComponent()->GetCamera())
+			{
+				FCamera* GameCamera = PIEWorld->GetActiveCameraComponent()->GetCamera();
+				GameCamera->SetAspectRatio(AspectRatio);
+				Queue.ProjectionMatrix = GameCamera->GetProjectionMatrix();
+				Queue.ViewMatrix = GameCamera->GetViewMatrix();
+			}
+			else bUseGameCamera = false;
+		}
+		if (!bUseGameCamera)
+		{
+			Queue.ProjectionMatrix = Entry.LocalState.BuildProjMatrix(AspectRatio);
+			Queue.ViewMatrix = Entry.LocalState.BuildViewMatrix();
+		}
 
 		FFrustum Frustum;
 		Frustum.ExtractFromVP(Queue.ViewMatrix * Queue.ProjectionMatrix);
 		const FVector CameraPosition = Queue.ViewMatrix.GetInverse().GetTranslation();
-		BuildRenderCommands(Engine, Level, Frustum, Entry.LocalState.ShowFlags, CameraPosition, Queue);
+
+		// PIE 상태라면 모든 뷰포트에서 에디터 요소(빌보드, UUID, 시각화 아이콘 등) 플래그를 끈다.
+		FShowFlags RenderShowFlags = Entry.LocalState.ShowFlags;
+		const bool bIsPIE = EditorEngine->IsPlayingInEditor();
+		const bool bIsPIEViewport = bIsPIE && (Entry.Id == PIEViewportId);
+
+		if (bIsPIE)
+		{
+			// [수정]: PIE 중에도 일반 액터(StaticMesh 등)의 UUID는 보이도록 SF_UUID를 유지하거나 켭니다.
+			// 카메라 액터의 UUID는 RenderCollector에서 개별적으로 숨겨집니다.
+			RenderShowFlags.SetFlag(EEngineShowFlags::SF_Billboard, false);
+			RenderShowFlags.SetFlag(EEngineShowFlags::SF_EditorActorVisualization, false);
+			
+			// 에디터 설정에서 UUID가 켜져있다면 PIE 화면에서도 강제로 출력되도록 보장
+			if (Entry.LocalState.ShowFlags.HasFlag(EEngineShowFlags::SF_UUID))
+			{
+				RenderShowFlags.SetFlag(EEngineShowFlags::SF_UUID, true);
+			}
+		}
+
+		BuildRenderCommands(Engine, TargetLevel, Frustum, RenderShowFlags, CameraPosition, Queue);
 
 		AActor* GizmoTarget = EditorEngine->GetSelectedActor();
-		if (GizmoTarget && GizmoTarget->GetComponentByClass<USkyComponent>() == nullptr)
+		const bool bGizmoTargetInCorrectWorld = GizmoTarget && (GizmoTarget->GetLevel() == TargetLevel);
+
+		// [수정]: PIE 메인 뷰포트가 아닐 때만 기즈모를 렌더링 (나머지 3개 에디터 뷰포트용)
+		if (bGizmoTargetInCorrectWorld && GizmoTarget->GetComponentByClass<USkyComponent>() == nullptr && !bIsPIEViewport)
 		{
 			Gizmo.BuildRenderCommands(GizmoTarget, &Entry, Queue);
 		}
@@ -123,7 +184,8 @@ void FEditorViewportRenderService::RenderAll(
 			ApplyWireframe(Queue, WireFrameMaterial.get());
 		}
 
-		if (Entry.LocalState.bShowGrid && GridMesh && GridMaterial)
+		// [수정]: PIE 메인 뷰포트가 아닐 때만 그리드를 렌더링 (또는 에디터 설정에 따라)
+		if (Entry.LocalState.bShowGrid && GridMesh && GridMaterial && !bIsPIEViewport)
 		{
 			FVector GridAxisU = FVector::ForwardVector;
 			FVector GridAxisV = FVector::RightVector;

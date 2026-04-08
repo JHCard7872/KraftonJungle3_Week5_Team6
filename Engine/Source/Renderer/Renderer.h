@@ -112,6 +112,10 @@ public:
 	FMaterial* GetDefaultMaterial() const { return DefaultMaterial.get(); }
 	/** 렌더러가 기본으로 사용하는 텍스처 머티리얼을 반환한다. */
 	FMaterial* GetDefaultTextureMaterial() const { return DefaultTextureMaterial.get(); }
+
+	void SetCurrentRenderingLevel(ULevel* InLevel) { CurrentRenderingLevel = InLevel; }
+	ULevel* GetCurrentRenderingLevel() const { return CurrentRenderingLevel; }
+
 	/** 직전 프레임의 커맨드 개수를 반환해 다음 프레임 reserve 힌트로 사용한다. */
 	size_t GetPrevCommandCount() const { return PrevCommandCount; }
 	std::unique_ptr<FRenderStateManager>& GetRenderStateManager() { return RenderStateManager; }
@@ -222,6 +226,7 @@ private:
 	FTextMeshBuilder TextRenderer;
 	FSubUVRenderer SubUVRenderer;
 
+	ULevel* CurrentRenderingLevel = nullptr;
 	ID3D11ShaderResourceView* FolderIconSRV = nullptr;
 	ID3D11ShaderResourceView* FileIconSRV = nullptr;
 

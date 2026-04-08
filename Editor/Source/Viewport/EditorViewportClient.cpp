@@ -121,17 +121,9 @@ void FEditorViewportClient::Detach(FEngine* Engine, FRenderer* Renderer)
 {
 	Gizmo.EndDrag();
 
-	// PIE 전환 시에도 Detach가 호출되는데, DetachFromRenderer → ClearViewportCallbacks →
-	// GUIShutdown() → ImGui::DestroyContext() 순서로 실행되어 GImGui = nullptr가 된다.
-	// 이 시점은 아직 ImGui 프레임이 진행 중(Button 콜백 내부)이므로 즉시 크래시한다.
-	// → DetachFromRenderer 호출을 제거한다. ImGui 컨텍스트는 에디터 수명 동안 유지된다.
-	// → Attach 재호출 시 AttachToRenderer의 bViewportClientActive 가드가 중복 초기화를 막는다.
-	// 그래픽 리소스(BlitRenderer, Grid)는 해제해두고 Attach에서 재생성한다.
-	//EditorUI.DetachFromRenderer(Renderer);
-
-	BlitRenderer.Release();
-	// GridMesh / GridMaterial은 PIE 중에도 EditorEngine이 재사용하므로 해제하지 않는다.
-	// Attach()의 if (!GridMesh) 가드가 재진입 시 중복 생성을 방지한다.
+	// [수정]: PIE 전환 시에도 4분할 렌더링(BlitAll)이 계속 필요하므로 BlitRenderer를 해제하지 않는다.
+	// GridMesh / GridMaterial과 마찬가지로 에디터 수명 동안 유지하며 Attach 시 if(!res) 가드로 재사용한다.
+	// BlitRenderer.Release(); 
 }
 
 void FEditorViewportClient::Tick(FEngine* Engine, float DeltaTime)
