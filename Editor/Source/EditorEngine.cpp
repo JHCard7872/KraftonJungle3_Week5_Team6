@@ -8,6 +8,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Core/ConsoleVariableManager.h"
 #include "Core/Engine.h"
+#include "Input/InputManager.h"
 #include "Debug/EngineLog.h"
 #include "Asset/ObjManager.h"
 #include "Core/Paths.h"
@@ -73,7 +74,18 @@ void FEditorEngine::StartPIE()
 {
 	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World) return;
 
-	UE_LOG("[PIE] Starting Play in Editor...");
+	UE_LOG("[PIE] Play In Editor Started.");
+
+	// 현재 에디터 카메라 정보 저장
+	FVector EditorCamPos;
+	float EditorCamYaw = 0.0f;
+	float EditorCamPitch = 0.0f;
+	if (UCameraComponent* EditorCam = EditorWorldContext->World->GetActiveCameraComponent())
+	{
+		EditorCamPos = EditorCam->GetCamera()->GetPosition();
+		EditorCamYaw = EditorCam->GetCamera()->GetYaw();
+		EditorCamPitch = EditorCam->GetCamera()->GetPitch();
+	}
 
 	FDuplicateionContext Context;
 	UWorld* EditorWorld = EditorWorldContext->World;
@@ -92,15 +104,34 @@ void FEditorEngine::StartPIE()
 
 	ActiveEditorWorldContext = PIEWorldContext;
 
+	// PIE 월드의 카메라를 에디터 카메라 위치로 동기화
+	if (UCameraComponent* PIECam = PIEWorld->GetActiveCameraComponent())
+	{
+		PIECam->GetCamera()->SetPosition(EditorCamPos);
+		PIECam->GetCamera()->SetRotation(EditorCamYaw, EditorCamPitch);
+	}
+
 	PIEWorld->BeginPlay();
 	SyncViewportClient();
+
+	// 마우스 캡처 시작
+	if (FInputManager* Input = GetInputManager())
+	{
+		Input->SetMouseCapture(true);
+	}
 }
 
 void FEditorEngine::EndPIE()
 {
 	if (!IsPlayingInEditor()) return;
 
-	UE_LOG("[PIE] Stoppinig Play In Editor...");
+	UE_LOG("[PIE] Play In Editor Stopped.");
+
+	// 마우스 캡처 해제
+	if (FInputManager* Input = GetInputManager())
+	{
+		Input->SetMouseCapture(false);
+	}
 
 	if (PIEWorldContext && PIEWorldContext->World)
 	{
@@ -304,6 +335,27 @@ void FEditorEngine::FinalizeInitialize()
 
 void FEditorEngine::PrepareFrame(float DeltaTime)
 {
+	if (IsPlayingInEditor())
+	{
+		if (::GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+		{
+			EndPIE();
+		}
+
+		// F8: Possess/Eject 토글
+		static bool bF8WasDown = false;
+		bool bF8IsDown = (::GetAsyncKeyState(VK_F8) & 0x8000) != 0;
+		if (bF8IsDown && !bF8WasDown)
+		{
+			if (FInputManager* Input = GetInputManager())
+			{
+				Input->SetMouseCapture(!Input->IsMouseCaptured());
+				UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
+			}
+		}
+		bF8WasDown = bF8IsDown;
+	}
+
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
 	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetLevel(), DeltaTime);
