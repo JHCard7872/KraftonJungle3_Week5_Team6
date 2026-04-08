@@ -174,6 +174,13 @@ void FEditorUI::AttachToRenderer(FRenderer* InRenderer)
 		return;
 	}
 
+	// PIE 종료 후 EditorViewportClient::Attach가 다시 호출될 때 중복 초기화를 막는다.
+	// Detach 시 ImGui 컨텍스트를 유지하므로, 이미 활성 상태면 재초기화가 불필요하다.
+	if (bViewportClientActive)
+	{
+		return;
+	}
+
 	bViewportClientActive = true;
 	CurrentRenderer = InRenderer;
 
@@ -691,6 +698,8 @@ void FEditorUI::Render()
 						Cam->GetCamera()->SetRotation(0.f, 0.f);
 					}
 					Engine->GetLevel()->ClearActors();
+					// 새 레벨에도 기본 카메라 액터를 보장한다.
+					Engine->EnsureDefaultCameraActor();
 					UE_LOG("New Level created");
 				}
 			}

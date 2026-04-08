@@ -354,6 +354,7 @@ FWorldContext* FEngine::CreateWorldContext(const FString& ContextName, EWorldTyp
 	std::unique_ptr<FWorldContext> NewContext = std::make_unique<FWorldContext>();
 	NewContext->ContextName = ContextName;
 	NewContext->WorldType = WorldType;
+	// 일단 TempWorld를 사용하자...
 	NewContext->World = FObjectFactory::ConstructObject<UWorld>(nullptr, ContextName);
 	if (!NewContext->World)
 	{

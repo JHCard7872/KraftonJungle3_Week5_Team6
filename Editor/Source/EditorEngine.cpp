@@ -3,6 +3,7 @@
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include "Actor/Actor.h"
+#include "Actor/CameraActor.h"
 #include "Camera/Camera.h"
 #include "Component/CameraComponent.h"
 #include "Component/StaticMeshComponent.h"
@@ -10,6 +11,7 @@
 #include "Core/Engine.h"
 #include "Input/InputManager.h"
 #include "Debug/EngineLog.h"
+#include "Input/InputManager.h"
 #include "Asset/ObjManager.h"
 #include "Core/Paths.h"
 #include "Object/ObjectFactory.h"
@@ -87,11 +89,43 @@ void FEditorEngine::StartPIE()
 		EditorCamPitch = EditorCam->GetCamera()->GetPitch();
 	}
 
+	// PIE 진입 전 에디터 선택을 해제한다.
+	// 선택된 채로 PIE에 진입하면 에디터 액터를 가리키는 SelectionSubsystem 포인터가
+	// PIE 중 기즈모 드래그로 에디터 액터를 직접 이동시키는 문제가 발생한다.
+	SetSelectedActor(nullptr);
+
 	FDuplicateionContext Context;
 	UWorld* EditorWorld = EditorWorldContext->World;
 
 	UWorld* PIEWorld = static_cast<UWorld*>(EditorWorld->Duplicate(Context, nullptr));
-	PIEWorld->FixupReferences(Context);
+	// Duplicate 끝난 뒤 Context에 등록된 모든 복사본에 FixupReferences 호출해야 함.
+	// 루트(PIEWorld)만 호출하면 Actor::RootComponent, ActorComponent::Owner,
+	// SceneComponent::AttachParent/Children 등 Actor, Component 계층의 포인터는
+	// 여전히 EditorWorld의 오브젝트를 가리킨 채로 남음.
+	for (auto& [OldObj, NewObj] : Context.DuplicatedObjects)
+	{
+		//PIEWorld->FixupReferences(Context);
+		NewObj->FixupReferences(Context);
+	}
+
+	// 레벨에 ACameraActor가 있으면 그 컴포넌트를 PIE 월드의 활성 카메라로 설정함.
+	// UE와 동일하게 배치된 카메라 액터의 시점으로 PIE가 시작됨.
+	if (ULevel* PIELevel = PIEWorld->GetLevel())
+	{
+		for (AActor* Actor : PIELevel->GetActors())
+		{
+			if (Actor && Actor->IsA(ACameraActor::StaticClass()))
+			{
+				ACameraActor* CameraActor = static_cast<ACameraActor*>(Actor);
+				if (UCameraComponent* CameraComponent = CameraActor->GetCameraComponent())
+				{
+					PIEWorld->SetActiveCameraComponent(CameraComponent);
+					UE_LOG("[PIE] Camera possession: ACameraActor");
+				}
+				break;
+			}
+		}
+	}
 
 	float AspectRatio = MainWindow ? (static_cast<float>(MainWindow->GetWidth()) / static_cast<float>(MainWindow->GetHeight())) : 1.0f;
 
@@ -102,6 +136,12 @@ void FEditorEngine::StartPIE()
 		PIEWorldContext->World = PIEWorld;
 	}
 
+	// CopyPropertiesFrom이 EditorWorld의 WorldType(= EWorldType::Editor)을 복사하므로
+	// 명시적으로 PIE 타입으로 덮어써야 한다.
+	// 이 값이 Editor인 채로 남으면 FEditorCameraSubsystem::SyncActiveCamera가
+	// IsEditorLevel() == true로 판정해 매 프레임 PIE 카메라를 에디터 카메라로 덮어쓴다.
+	PIEWorld->SetWorldType(EWorldType::PIE);
+	
 	ActiveEditorWorldContext = PIEWorldContext;
 
 	// PIE 월드의 카메라를 에디터 카메라 위치로 동기화
@@ -146,6 +186,18 @@ void FEditorEngine::EndPIE()
 		DestroyWorldContext(PIEWorldContext);
 		PIEWorldContext = nullptr;
 	}
+	
+	// PIE 종료 시 선택을 해제한다. PIE 월드 액터 포인터가 에디터 서브시스템에 남으면
+	// DestroyWorldContext 이후 댕글링 포인터가 될 수 있다.
+	SetSelectedActor(nullptr);
+
+	// PIE 전용 뷰포트 클라이언트를 해제한다.
+	// reset() 전에 먼저 ActiveViewportClient를 nullptr로 교체해
+	// 해제된 포인터에 Detach가 호출되지 않도록 한다.
+	// SetViewportClient(nullptr)이 살아 있는 PIEViewportClient 위에서 Detach를 호출한 뒤
+	// ActiveViewportClient를 nullptr로 만들어 주므로 안전하다.
+	SetViewportClient(nullptr);
+	PIEViewportClient.reset();
 
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
@@ -156,11 +208,13 @@ void FEditorEngine::Shutdown()
 	FEngineLog::Get().SetCallback({});
 	EditorUI.SaveEditorSettings();
 
-	if (GetViewportClient() == PreviewViewportClient.get())
+	if (GetViewportClient() == PreviewViewportClient.get() ||
+		GetViewportClient() == PIEViewportClient.get())
 	{
 		SetViewportClient(nullptr);
 	}
 
+	PIEViewportClient.reset();
 	PreviewViewportClient.reset();
 	CameraSubsystem.Shutdown();
 	SelectionSubsystem.Shutdown();
@@ -359,6 +413,20 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
 	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetLevel(), DeltaTime);
+
+	if (IsPlayingInEditor())
+	{
+		// ESC로 PIE 종료
+		FInputManager* Input = GetInputManager();
+		if (Input && Input->IsKeyDown(VK_ESCAPE))
+		{
+			EndPIE();
+			return;
+		}
+
+		// PIE 중 우클릭 + WASD/마우스로 카메라 이동
+		TickPIECamera(DeltaTime);
+	}
 }
 
 void FEditorEngine::TickWorlds(float DeltaTime)
@@ -386,9 +454,73 @@ void FEditorEngine::RenderFrame()
 
 	Renderer->BeginFrame();
 
-	if (EditorViewportClientRaw)
+	// EditorViewportClientRaw를 직접 참조하면 PIE 중에도 에디터 렌더러(기즈모, 선택 등)가 계속 사용됨.
+	// GetViewportClient()를 통해 현재 활성 ViewportClient를 가져오면
+	// SyncViewportClient에서 교체된 FGameViewportClient가 PIE 중 자동으로 사용됨.
+	/*if (EditorViewportClientRaw)
 	{
 		EditorViewportClientRaw->Render(this, Renderer);
+	}*/
+	if (IsPlayingInEditor() && PIEViewportClient && EditorViewportClientRaw)
+	{
+		// ── PIE 렌더 전략 ──────────────────────────────────────────────────
+		// 1) 에디터 뷰포트 클라이언트로 에디터 UI(ImGui 메뉴바·아웃라이너 등)를 먼저 렌더한다.
+		EditorViewportClientRaw->Render(this, Renderer);
+
+		// UI 렌더 중 Stop 버튼이나 ESC로 EndPIE()가 호출될 수 있으므로
+		// 같은 프레임에서 PIE 전용 클라이언트를 다시 확인한다.
+		if (!IsPlayingInEditor())
+		{
+			Renderer->EndFrame();
+			return;
+		}
+
+		// 2) 포커스된 뷰포트 패널 영역에만 게임 화면을 덮어쓴다.
+		//    패널 rect를 D3D11 Viewport로 설정 후 FGameViewportClient를 호출한다.
+		FSlateApplication* Slate = SlateApplication.get();
+		FViewportId FocusedId = Slate ? Slate->GetFocusedViewportId() : INVALID_VIEWPORT_ID;
+		FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+		if (!Entry && !ViewportRegistry.GetEntries().empty())
+		{
+			Entry = &ViewportRegistry.GetEntries().front();
+		}
+
+		if (Entry && Entry->Viewport)
+		{
+			const FRect& Rect = Entry->Viewport->GetRect();
+			if (Rect.Width > 0 && Rect.Height > 0)
+			{
+				// PIE 카메라 종횡비를 현재 뷰포트 패널에 맞춘다.
+				UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+				if (PIEWorld)
+				{
+					if (UCameraComponent* Cam = PIEWorld->GetActiveCameraComponent())
+					{
+						if (Cam->GetCamera())
+						{
+							Cam->GetCamera()->SetAspectRatio(
+								static_cast<float>(Rect.Width) / static_cast<float>(Rect.Height));
+						}
+					}
+				}
+
+				// D3D11 뷰포트를 패널 rect로 제한한 뒤 게임 씬을 렌더한다.
+				D3D11_VIEWPORT VP = {};
+				VP.TopLeftX = static_cast<float>(Rect.X);
+				VP.TopLeftY = static_cast<float>(Rect.Y);
+				VP.Width = static_cast<float>(Rect.Width);
+				VP.Height = static_cast<float>(Rect.Height);
+				VP.MinDepth = 0.0f;
+				VP.MaxDepth = 1.0f;
+				Renderer->GetDeviceContext()->RSSetViewports(1, &VP);
+
+				PIEViewportClient->Render(this, Renderer);
+			}
+		}
+	}
+	if (IViewportClient* ActiveClient = GetViewportClient())
+	{
+		ActiveClient->Render(this, Renderer);
 	}
 
 	Renderer->EndFrame();
@@ -515,8 +647,34 @@ bool FEditorEngine::InitEditorWorlds(int32 Width, int32 Height)
 		return false;
 	}
 
+	// 레벨에 CameraActor가 없으면 기본 카메라 액터를 하나 스폰한다.
+	// DefaultLevel.json에 저장된 CameraActor가 있으면 이미 로드됐으므로 중복 생성하지 않는다.
+	EnsureDefaultCameraActor();
+
 	ActivateEditorLevel();
 	return true;
+}
+
+void FEditorEngine::EnsureDefaultCameraActor()
+{
+	ULevel* Level = GetEditorLevel();
+	if (!Level) return;
+
+	for (AActor* Actor : Level->GetActors())
+	{
+		if (Actor && Actor->IsA(ACameraActor::StaticClass()))
+		{
+			return; // 이미 존재하면 추가 생성 생략
+		}
+	}
+
+	ACameraActor* DefaultCam = Level->SpawnActor<ACameraActor>("DefaultCameraActor");
+	if (DefaultCam)
+	{
+		// UE 기본 카메라 위치와 동일하게 설정
+		DefaultCam->SetActorLocation(FVector(-5.0f, 0.0f, 2.0f));
+		UE_LOG("[Editor] Default CameraActor spawned.");
+	}
 }
 
 void FEditorEngine::ReleaseEditorWorlds()
@@ -576,6 +734,15 @@ void FEditorEngine::SyncFocusedViewportLocalState()
 		return;
 	}
 
+	if (IsPlayingInEditor())
+	{
+		// PIE 중 우클릭 + WASD 입력은 TickPIECamera()가 전담한다.
+		// 에디터 viewport LocalState까지 입력 컨트롤러에 연결하면
+		// PIE 종료 후 에디터 시점이 같이 이동한 것처럼 보이게 된다.
+		CameraSubsystem.GetViewportController()->SetActiveLocalState(nullptr);
+		return;
+	}
+
 	FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
 	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
 	FViewportLocalState* LocalState = nullptr;
@@ -628,6 +795,16 @@ void FEditorEngine::SyncViewportClient()
 	{
 		TargetViewportClient = PreviewViewportClient.get();
 	}
+	else if (ActiveLevelContext && ActiveLevelContext->WorldType == EWorldType::PIE)
+	{
+		// PIE 진입 시 FGameViewportClient로 전환해 에디터 기즈모, 선택 영역 없이 게임 렌더를 수행함.
+		// FGameViewportClient가 없으면 지연 생성함.
+		if (!PIEViewportClient)
+		{
+			PIEViewportClient = std::make_unique<FGameViewportClient>();
+		}
+		TargetViewportClient = PIEViewportClient.get();
+	}
 
 	if (GetViewportClient() != TargetViewportClient)
 	{
@@ -646,4 +823,38 @@ FViewport* FEditorEngine::FindViewport(FViewportId Id)
 	}
 
 	return nullptr;
+}
+
+void FEditorEngine::TickPIECamera(float DeltaTime)
+{
+	// PIE 중 우클릭 + WASD/마우스로 에디터 플라이스루와 동일한 방식으로 카메라를 조작한다.
+	// 에디터 카메라(FEditorCameraSubsystem)와 독립적으로 PIEWorld의 ActiveCamera를 직접 구동한다.
+	FInputManager* Input = GetInputManager();
+	if (!Input) return;
+
+	// 우클릭이 없으면 카메라 입력을 무시한다.
+	if (!Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT)) return;
+
+	UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+	if (!PIEWorld) return;
+
+	UCameraComponent* CamComp = PIEWorld->GetActiveCameraComponent();
+	if (!CamComp) return;
+
+	FCamera* Camera = CamComp->GetCamera();
+	if (!Camera) return;
+
+	// 마우스 델타로 Yaw/Pitch 회전
+	const float Sensitivity = Camera->GetMouseSensitivity();
+	const float DX = Input->GetMouseDeltaX();
+	const float DY = Input->GetMouseDeltaY();
+	Camera->Rotate(DX * Sensitivity, -DY * Sensitivity);
+
+	// WASD + Q/E 로 이동 (FCamera::MoveXxx 는 내부에서 Speed * Delta 적용)
+	if (Input->IsKeyDown('W')) Camera->MoveForward(DeltaTime);
+	if (Input->IsKeyDown('S')) Camera->MoveForward(-DeltaTime);
+	if (Input->IsKeyDown('A')) Camera->MoveRight(-DeltaTime);
+	if (Input->IsKeyDown('D')) Camera->MoveRight(DeltaTime);
+	if (Input->IsKeyDown('E')) Camera->MoveUp(DeltaTime);
+	if (Input->IsKeyDown('Q')) Camera->MoveUp(-DeltaTime);
 }
