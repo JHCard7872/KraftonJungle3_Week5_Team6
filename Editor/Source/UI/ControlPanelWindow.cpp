@@ -5,7 +5,7 @@
 #include "Renderer/Renderer.h"
 #include "Scene/Level.h"
 #include "Actor/Actor.h"
-#include "Component/TextComponent.h"
+#include "Component/TextRenderComponent.h"
 #include "Component/SkyComponent.h"
 #include "Object/ObjectFactory.h"
 #include "Camera/Camera.h"
@@ -28,6 +28,7 @@
 #include "Actor/StaticMeshActor.h"
 #include "Actor/SubUVActor.h"
 #include "Actor/TextActor.h"
+#include "Actor/BillboardActor.h"
 #include "Math/MathUtility.h"
 #include "Asset/ObjManager.h"
 #include "Renderer/Material.h"
@@ -193,7 +194,7 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 		ImGui::SeparatorText("Spawn");
 
 		static int32 SpawnTypeIndex = 0;
-		const char* SpawnTypes[] = { "Cube", "Sphere", "Plane", "SubUV", "Text", "SkySphere", "Staticmesh" , "Camera" };
+		const char* SpawnTypes[] = { "Cube", "Sphere", "Plane", "SubUV", "Text", "SkySphere", "Staticmesh", "Billboard", "Camera" };
 
 		ImGui::Combo("Type", &SpawnTypeIndex, SpawnTypes, IM_ARRAYSIZE(SpawnTypes));
 
@@ -238,7 +239,7 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 				if (NewActor)
 				{
 					ATextActor* TextActor = static_cast<ATextActor*>(NewActor);
-					if (UTextComponent* TextComponent = TextActor->GetComponentByClass<UTextComponent>())
+					if (UTextRenderComponent* TextComponent = TextActor->GetComponentByClass<UTextRenderComponent>())
 					{
 						if (SpawnTextBuffer[0] != '\0') TextComponent->SetText(SpawnTextBuffer);
 						else TextComponent->SetText("Text");
@@ -249,13 +250,9 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 			{
 				NewActor = Level->SpawnActor<ASkySphereActor>(Name);
 			}
-			else if (SpawnTypeIndex == 7)
+			else if (SpawnTypeIndex == 6)
 			{
-				// Camera (index 7): PIE 시 이 액터의 시점으로 카메라가 전환된다.
-				NewActor = Level->SpawnActor<ACameraActor>(Name);
-			}
-			else
-			{
+
 				NewActor = Level->SpawnActor<AActor>(Name);
 				if (NewActor)
 				{
@@ -279,6 +276,15 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 					NewActor->AddOwnedComponent(MeshComp);
 					NewActor->SetRootComponent(MeshComp);
 				}
+			}
+			else if (SpawnTypeIndex == 8)
+			{
+				// Camera (index 7): PIE 시 이 액터의 시점으로 카메라가 전환된다.
+				NewActor = Level->SpawnActor<ACameraActor>(Name);
+			}
+			else
+			{
+				NewActor = Level->SpawnActor<ABillboardActor>(Name);
 			}
 
 			// ─── 마무리: 에디터 선택 및 로그 출력 ───
