@@ -58,7 +58,6 @@ void UTextRenderComponent::Serialize(FArchive& Ar)
 void UTextRenderComponent::FixupReferences(const FDuplicateionContext& Context)
 {
 	UPrimitiveComponent::FixupReferences(Context);
-	UPrimitiveComponent::FixupReferences(Context);
 
 	// 2. 포인터 공유 방지 (PIE 복제본에게만 새 도화지 발급)
 	this->TextMesh = std::make_shared<FDynamicMesh>();
