@@ -18,6 +18,8 @@
 #include "Scene/Level.h"
 #include "Viewport/Viewport.h"
 #include "Viewport/EditorViewportClient.h"
+#include "Renderer/RenderCommand.h"
+#include "Renderer/Material.h"
 #include "Viewport/PreviewViewportClient.h"
 #include "World/World.h"
 #include "Slate/EditorViewportOverlay.h"
@@ -123,6 +125,7 @@ void FEditorEngine::StartPIE()
 				ACameraActor* CameraActor = static_cast<ACameraActor*>(Actor);
 				if (UCameraComponent* CameraComponent = CameraActor->GetCameraComponent())
 				{
+					CameraComponent->ApplyComponentTransformToCamera();
 					PIEWorld->SetActiveCameraComponent(CameraComponent);
 					UE_LOG("[PIE] Camera possession: ACameraActor");
 					bPossessedCameraActor = true;
@@ -584,9 +587,9 @@ void FEditorEngine::RenderFrame()
 			if (Entry && Entry->Viewport)
 			{
 				const FRect& Rect = Entry->Viewport->GetRect();
+				UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
 				if (Rect.Width > 0 && Rect.Height > 0)
 				{
-					UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
 					if (PIEWorld)
 					{
 						if (UCameraComponent* Cam = PIEWorld->GetActiveCameraComponent())
@@ -609,6 +612,47 @@ void FEditorEngine::RenderFrame()
 					static_cast<float>(Rect.Width), static_cast<float>(Rect.Height), 0.0f, 1.0f);
 
 				PIEViewportClient->Render(this, Renderer);
+
+				// ── PIE 그리드 렌더링 ────────────────────────────────────
+				// EditorViewportClient가 생성·보유한 GridMesh/GridMaterial을 재사용해
+				// PIE 화면에도 XY 평면 그리드를 그린다.
+				if (Entry->LocalState.bShowGrid)
+				{
+					FDynamicMesh* GridMesh = EditorViewportClientRaw->GetGridMesh();
+					FMaterial* GridMat = EditorViewportClientRaw->GetGridMaterial();
+
+					if (GridMesh && GridMat && PIEWorld)
+					{
+						if (UCameraComponent* PIECam = PIEWorld->GetActiveCameraComponent())
+						{
+							FRenderCommandQueue GridQueue;
+							GridQueue.ViewMatrix = PIECam->GetViewMatrix();
+							GridQueue.ProjectionMatrix = PIECam->GetProjectionMatrix();
+
+							// Perspective: XZ 평면(ForwardVector/RightVector) 고정
+							const FVector GridAxisU = FVector::ForwardVector;
+							const FVector GridAxisV = FVector::RightVector;
+							const FVector ViewForward =
+								GridQueue.ViewMatrix.GetInverse().GetForwardVector().GetSafeNormal();
+
+							GridMat->SetParameterData("GridSize", &Entry->LocalState.GridSize, 4);
+							GridMat->SetParameterData("LineThickness", &Entry->LocalState.LineThickness, 4);
+							GridMat->SetParameterData("GridAxisU", &GridAxisU, sizeof(FVector));
+							GridMat->SetParameterData("GridAxisV", &GridAxisV, sizeof(FVector));
+							GridMat->SetParameterData("ViewForward", &ViewForward, sizeof(FVector));
+
+							FRenderCommand GridCommand;
+							GridCommand.RenderMesh = GridMesh;
+							GridCommand.Material = GridMat;
+							GridCommand.WorldMatrix = FMatrix::Identity;
+							GridCommand.RenderLayer = ERenderLayer::Default;
+							GridQueue.AddCommand(GridCommand);
+
+							Renderer->SubmitCommands(GridQueue);
+							Renderer->ExecuteCommands();
+						}
+					}
+				}
 			}
 			Renderer->EndFrame();
 			return;

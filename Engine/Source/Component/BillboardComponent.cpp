@@ -5,18 +5,8 @@
 #include "Renderer/MaterialManager.h"
 #include "Object/Object.h"
 #include "Object/Class.h"
-#include "Object/ObjectFactory.h"
 
 IMPLEMENT_RTTI(UBillboardComponent, UPrimitiveComponent)
-
-UBillboardComponent::~UBillboardComponent()
-{
-	if (BaseMaterial)
-	{
-		BaseMaterial->MarkPendingKill();
-		BaseMaterial = nullptr;
-	}
-}
 
 void UBillboardComponent::PostConstruct()
 {
@@ -24,8 +14,7 @@ void UBillboardComponent::PostConstruct()
 	bBillboard = true;
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
-	BaseMaterial = FObjectFactory::ConstructObject<UMaterial>(this, GetName() + "_Mat");
-	BaseMaterial->SetRenderMaterial(FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial());
+	MaterialInstance = FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial();
 }
 
 FBoxSphereBounds UBillboardComponent::GetWorldBounds() const
@@ -48,9 +37,17 @@ FRenderMesh* UBillboardComponent::GetRenderMesh() const
 
 void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture)
 {
-	if (BaseMaterial && BaseMaterial->GetRenderMaterial())
+	if (MaterialInstance)
 	{
-		BaseMaterial->SetDiffuse(InTexture.get());
-		BaseMaterial->GetRenderMaterial()->SetMaterialTexture(InTexture);
+		MaterialInstance->SetMaterialTexture(InTexture);
+	}
+}
+
+void UBillboardComponent::ResetMaterial(const FString& MaterialName)
+{
+	auto Base = FMaterialManager::Get().FindByName(MaterialName);
+	if (Base)
+	{
+		MaterialInstance = Base->CreateDynamicMaterial();
 	}
 }

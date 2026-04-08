@@ -72,6 +72,10 @@ void FGameViewportClient::Render(FEngine* Engine, FRenderer* Renderer)
 	const FVector CameraPosition = Queue.ViewMatrix.GetInverse().GetTranslation();
 
 	FShowFlags GameShowFlags;
+	// 에디터 전용 시각화(카메라 아이콘, 방향 화살표 등)는 PIE에서 렌더링하지 않는다.
+	GameShowFlags.SetFlag(EEngineShowFlags::SF_EditorActorVisualization, false);
+	// UUID 텍스트는 에디터 전용 — PIE에서는 숨긴다.
+	GameShowFlags.SetFlag(EEngineShowFlags::SF_UUID, false);
 	BuildRenderCommands(Engine, Level, Frustum, GameShowFlags, CameraPosition, Queue);
 
 	Renderer->SubmitCommands(Queue);

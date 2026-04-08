@@ -13,6 +13,9 @@ enum class EEngineShowFlags : uint64
 	SF_Grid = 1<<7,
 	 // SF_Grid        = 1 << 3,
 	 // SF_Fog         = 1 << 4,
+	/** 에디터에서만 보이는 액터 시각화 (카메라 아이콘, 방향 화살표 등).
+	 *  FGameViewportClient에서는 비활성화해 PIE에서는 렌더링하지 않는다. */
+	SF_EditorActorVisualization = 1 << 8,
 };
 class ENGINE_API FShowFlags
 {
@@ -22,7 +25,8 @@ public:
 			static_cast<uint64>(EEngineShowFlags::SF_Primitives) |
 			static_cast<uint64>(EEngineShowFlags::SF_UUID) |
 			static_cast<uint64>(EEngineShowFlags::SF_Billboard) |
-			static_cast<uint64>(EEngineShowFlags::SF_Text)) {
+			static_cast<uint64>(EEngineShowFlags::SF_Text) | 
+			static_cast<uint64>(EEngineShowFlags::SF_EditorActorVisualization)) {
 	}
 	void SetFlag(EEngineShowFlags InFlag, bool bEnabled);
 	bool HasFlag(EEngineShowFlags InFlag)const;

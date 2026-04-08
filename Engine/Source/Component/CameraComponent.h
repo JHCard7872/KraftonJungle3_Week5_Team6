@@ -2,6 +2,7 @@
 #include "SceneComponent.h"
 
 class FCamera;
+class FArchive;
 
 class ENGINE_API UCameraComponent : public USceneComponent
 {
@@ -12,6 +13,8 @@ public:
 	virtual ~UCameraComponent();
 
 	void PostConstruct() override;
+	void OnRegister() override;
+	void Serialize(FArchive& Ar) override;
 	virtual void Tick(float DeltaTime) override;
 	//Movement method
 	void MoveForward(float Value);
@@ -28,7 +31,10 @@ public:
 	void SetFov(float inFov);
 	void SetSpeed(float Inspeed);
 	void SetSensitivity(float InSetSensitivity);
+	void ApplyComponentTransformToCamera() const;
 
 private:
+	void SyncComponentTransformFromCamera();
+
 	FCamera* Camera = nullptr;
 };
