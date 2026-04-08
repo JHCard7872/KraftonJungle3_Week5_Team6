@@ -185,11 +185,6 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 				UMaterial* BaseMat = BillboardComp->GetBaseMaterial();
 				FMaterial* BillboardMat = BaseMat->GetRenderMaterial();
 
-				/*
-				FMaterialTexture* Test = BaseMat->GetDiffuse()->GetResource();
-				BillboardMat->SetMaterialTexture(std::shared_ptr<FMaterialTexture>(Test));
-				*/
-
 				if (BillboardMat && BillboardMat->GetMaterialTexture())
 				{
 					FRenderCommand Command;

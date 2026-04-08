@@ -13,7 +13,7 @@ UBillboardComponent::~UBillboardComponent()
 {
 	if (BaseMaterial)
 	{
-		delete BaseMaterial;
+		BaseMaterial->MarkPendingKill();
 		BaseMaterial = nullptr;
 	}
 }
@@ -25,7 +25,7 @@ void UBillboardComponent::PostConstruct()
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
 	BaseMaterial = FObjectFactory::ConstructObject<UMaterial>(this, GetName() + "_Mat");
-	BaseMaterial->SetRenderMaterial(FMaterialManager::Get().FindByName("M_Default_Texture"));
+	BaseMaterial->SetRenderMaterial(FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial());
 }
 
 FBoxSphereBounds UBillboardComponent::GetWorldBounds() const
