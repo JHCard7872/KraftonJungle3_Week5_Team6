@@ -12,6 +12,7 @@
 #include "Renderer/MaterialManager.h"
 #include "Component/BillboardComponent.h"
 #include "Component/ActorComponent.h"
+#include "Component/SceneComponent.h"
 
 void FPropertyWindow::SetTarget(const FVector& Location, const FVector& Rotation,
                                 const FVector& Scale, const char* ActorName)
@@ -245,6 +246,53 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 				ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "Component Details");
 				ImGui::Separator();
 
+				if (SelectedComponent->IsA(USceneComponent::StaticClass()))
+				{
+					USceneComponent* SceneComp = static_cast<USceneComponent*>(SelectedComponent);
+					
+					// ─── Transform ───
+					if (ImGui::CollapsingHeader("##Transform", ImGuiTreeNodeFlags_DefaultOpen))
+					{
+						ImGui::SameLine(); ImGui::Text("Transform");
+						ImGui::Indent(8.0f);
+
+						FTransform RelTM = SceneComp->GetRelativeTransform();
+
+						// Location
+						FVector Loc = RelTM.GetTranslation();
+						float LocArr[3] = { Loc.X, Loc.Y, Loc.Z };
+						if (ImGui::DragFloat3("##Location", LocArr, 0.1f, -FLT_MAX, FLT_MAX, "%.2f"))
+							SceneComp->SetRelativeLocation(FVector(LocArr[0], LocArr[1], LocArr[2]));
+						ImGui::SameLine(); ImGui::Text("Location");
+
+						// Rotation
+						FVector Rot = RelTM.Rotator().Euler();
+						float RotArr[3] = { Rot.X, Rot.Y, Rot.Z };
+						if (ImGui::DragFloat3("##Rotation", RotArr, 0.5f, -180.f, 180.f, "%.2f"))
+						{
+							FTransform NewTM = RelTM;
+							NewTM.SetRotation(FRotator::MakeFromEuler(FVector(RotArr[0], RotArr[1], RotArr[2])));
+							SceneComp->SetRelativeTransform(NewTM);
+						}
+						ImGui::SameLine(); ImGui::Text("Rotation");
+
+						// Scale
+						FVector Scale = RelTM.GetScale3D();
+						float ScaleArr[3] = { Scale.X, Scale.Y, Scale.Z };
+						if (ImGui::DragFloat3("##Scale", ScaleArr, 0.01f, 0.001f, FLT_MAX, "%.3f"))
+						{
+							FTransform NewTM = RelTM;
+							NewTM.SetScale3D(FVector(ScaleArr[0], ScaleArr[1], ScaleArr[2]));
+							SceneComp->SetRelativeTransform(NewTM);
+						}
+						ImGui::SameLine(); ImGui::Text("Scale");
+
+						ImGui::Unindent(8.0f);
+					}
+
+					ImGui::Separator();
+				}
+				
 				// ─── UBillboardComponent ───
 				if (SelectedComponent->IsA(UBillboardComponent::StaticClass())
 					&& !SelectedComponent->IsA(USubUVComponent::StaticClass()))
@@ -262,7 +310,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
 						FMaterial* Mat = BillboardComp->GetBaseMaterial()->GetRenderMaterial();
 						std::string CurrentMatName = Mat->GetMaterialTexture() ? Mat->GetOriginName() : "None";
-
+						
 						ImGui::PushItemWidth(180.f);
 						if (ImGui::BeginCombo("Sprite", CurrentMatName.c_str()))
 						{
