@@ -11,7 +11,6 @@
 #include "Core/Engine.h"
 #include "Input/InputManager.h"
 #include "Debug/EngineLog.h"
-#include "Input/InputManager.h"
 #include "Asset/ObjManager.h"
 #include "Core/Paths.h"
 #include "Object/ObjectFactory.h"
@@ -22,6 +21,7 @@
 #include "Viewport/PreviewViewportClient.h"
 #include "World/World.h"
 #include "Slate/EditorViewportOverlay.h"
+#include "Pawn/EditorCameraPawn.h"
 
 namespace
 {
@@ -47,20 +47,6 @@ namespace
 		}
 
 		UWorld* PreviewWorld = PreviewContext->World;
-		if (PreviewWorld->GetActors().empty())
-		{
-			/*AActor* PreviewActor = PreviewWorld->SpawnActor<AActor>("PreviewCube");
-			if (PreviewActor)
-			{
-				UStaticMeshComponent* PreviewComponent = FObjectFactory::ConstructObject<UStaticMeshComponent>(PreviewActor);
-				PreviewActor->AddOwnedComponent(PreviewComponent);
-				PreviewActor->SetRootComponent(PreviewComponent);
-
-				PreviewComponent->SetStaticMesh(FObjManager::GetPrimitiveCube());
-				PreviewActor->SetActorLocation({ 0.0f, 0.0f, 0.0f });
-			}*/
-		}
-
 		if (UCameraComponent* PreviewCamera = PreviewWorld->GetActiveCameraComponent())
 		{
 			PreviewCamera->GetCamera()->SetPosition({ -8.0f, -8.0f, 6.0f });
@@ -74,11 +60,21 @@ FEditorEngine::~FEditorEngine() = default;
 
 void FEditorEngine::StartPIE()
 {
-	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World) return;
+	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World)
+	{
+		return;
+	}
 
 	UE_LOG("[PIE] Play In Editor Started.");
 
-	// 현재 에디터 카메라 정보 저장
+	// 1. 에디터 카메라 상태 백업
+	EditorCameraStatesBackup.clear();
+	for (FViewportEntry& Entry : ViewportRegistry.GetEntries())
+	{
+		EditorCameraStatesBackup[Entry.Id] = Entry.LocalState;
+	}
+
+	// 2. 현재 에디터 카메라 정보 저장
 	FVector EditorCamPos;
 	float EditorCamYaw = 0.0f;
 	float EditorCamPitch = 0.0f;
@@ -87,6 +83,16 @@ void FEditorEngine::StartPIE()
 		EditorCamPos = EditorCam->GetCamera()->GetPosition();
 		EditorCamYaw = EditorCam->GetCamera()->GetYaw();
 		EditorCamPitch = EditorCam->GetCamera()->GetPitch();
+	}
+
+	// 3. 에디터 폰 좌표 즉시 동기화
+	if (AEditorCameraPawn* EditorPawn = CameraSubsystem.GetEditorCameraPawn())
+	{
+		EditorPawn->SetActorLocation(EditorCamPos);
+		if (UCameraComponent* EditorCamComp = EditorPawn->GetCameraComponent())
+		{
+			EditorCamComp->GetCamera()->SetRotation(EditorCamYaw, EditorCamPitch);
+		}
 	}
 
 	SetSelectedActor(nullptr);
@@ -99,6 +105,15 @@ void FEditorEngine::StartPIE()
 		NewObj->FixupReferences(Context);
 	}
 
+	float AspectRatio = MainWindow ? (static_cast<float>(MainWindow->GetWidth()) / static_cast<float>(MainWindow->GetHeight())) : 1.0f;
+	PIEWorldContext = CreateWorldContext("PIELevel", EWorldType::PIE, AspectRatio, false);
+	PIEWorldContext->World = PIEWorld;
+	PIEWorld->SetWorldType(EWorldType::PIE);
+	
+	ActiveEditorWorldContext = PIEWorldContext;
+
+	// 4. 카메라 설정 우선순위
+	bool bPossessedCameraActor = false;
 	if (ULevel* PIELevel = PIEWorld->GetLevel())
 	{
 		for (AActor* Actor : PIELevel->GetActors())
@@ -109,23 +124,21 @@ void FEditorEngine::StartPIE()
 				if (UCameraComponent* CameraComponent = CameraActor->GetCameraComponent())
 				{
 					PIEWorld->SetActiveCameraComponent(CameraComponent);
+					UE_LOG("[PIE] Camera possession: ACameraActor");
+					bPossessedCameraActor = true;
 				}
 				break;
 			}
 		}
 	}
 
-	float AspectRatio = MainWindow ? (static_cast<float>(MainWindow->GetWidth()) / static_cast<float>(MainWindow->GetHeight())) : 1.0f;
-	PIEWorldContext = CreateWorldContext("PIELevel", EWorldType::PIE, AspectRatio, false);
-	PIEWorldContext->World = PIEWorld;
-	PIEWorld->SetWorldType(EWorldType::PIE);
-	
-	ActiveEditorWorldContext = PIEWorldContext;
-
-	if (UCameraComponent* PIECam = PIEWorld->GetActiveCameraComponent())
+	if (!bPossessedCameraActor)
 	{
-		PIECam->GetCamera()->SetPosition(EditorCamPos);
-		PIECam->GetCamera()->SetRotation(EditorCamYaw, EditorCamPitch);
+		if (UCameraComponent* PIECam = PIEWorld->GetActiveCameraComponent())
+		{
+			PIECam->GetCamera()->SetPosition(EditorCamPos);
+			PIECam->GetCamera()->SetRotation(EditorCamYaw, EditorCamPitch);
+		}
 	}
 
 	PIEWorld->BeginPlay();
@@ -152,7 +165,10 @@ void FEditorEngine::StartPIE()
 
 void FEditorEngine::EndPIE()
 {
-	if (!IsPlayingInEditor()) return;
+	if (!IsPlayingInEditor())
+	{
+		return;
+	}
 
 	UE_LOG("[PIE] Play In Editor Stopped.");
 
@@ -171,10 +187,19 @@ void FEditorEngine::EndPIE()
 		DestroyWorldContext(PIEWorldContext);
 		PIEWorldContext = nullptr;
 	}
-	
+
 	SetSelectedActor(nullptr);
 	SetViewportClient(nullptr);
 	PIEViewportClient.reset();
+
+	for (auto& Pair : EditorCameraStatesBackup)
+	{
+		if (FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(Pair.first))
+		{
+			Entry->LocalState = Pair.second;
+		}
+	}
+	EditorCameraStatesBackup.clear();
 
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
@@ -185,10 +210,12 @@ void FEditorEngine::Shutdown()
 	FEngineLog::Get().SetCallback({});
 	EditorUI.SaveEditorSettings();
 
-	if (GetViewportClient() == PreviewViewportClient.get() ||
-		GetViewportClient() == PIEViewportClient.get())
+	if (IViewportClient* ActiveClient = GetViewportClient())
 	{
-		SetViewportClient(nullptr);
+		if (ActiveClient == PreviewViewportClient.get() || ActiveClient == PIEViewportClient.get())
+		{
+			SetViewportClient(nullptr);
+		}
 	}
 
 	PIEViewportClient.reset();
@@ -222,7 +249,6 @@ bool FEditorEngine::ActivatePreviewLevel(const FString& ContextName)
 	{
 		return false;
 	}
-
 	ActiveEditorWorldContext = PreviewContext;
 	return true;
 }
@@ -254,19 +280,16 @@ FWorldContext* FEditorEngine::CreatePreviewWorldContext(const FString& ContextNa
 	{
 		return nullptr;
 	}
-
 	if (FWorldContext* ExistingContext = FindPreviewWorld(ContextName))
 	{
 		return ExistingContext;
 	}
-
 	const float AspectRatio = (Height > 0) ? (static_cast<float>(Width) / static_cast<float>(Height)) : 1.0f;
 	FWorldContext* PreviewContext = CreateWorldContext(ContextName, EWorldType::Preview, AspectRatio, false);
 	if (!PreviewContext)
 	{
 		return nullptr;
 	}
-
 	PreviewWorldContexts.push_back(PreviewContext);
 	return PreviewContext;
 }
@@ -322,20 +345,16 @@ const FWorldContext* FEditorEngine::GetActiveWorldContext() const
 void FEditorEngine::HandleResize(int32 Width, int32 Height)
 {
 	FEngine::HandleResize(Width, Height);
-
 	if (Width == 0 || Height == 0)
 	{
 		return;
 	}
-
 	UpdateEditorWorldAspectRatio(static_cast<float>(Width) / static_cast<float>(Height));
 }
 
 void FEditorEngine::PreInitialize()
 {
-	// 에디터 UI가 올라오기 전에 DPI와 로그 연결만 먼저 준비한다.
 	ImGui_ImplWin32_EnableDpiAwareness();
-
 	FEngineLog::Get().SetCallback([this](const char* Msg)
 	{
 		EditorUI.GetConsole().AddLog("%s", Msg);
@@ -344,7 +363,6 @@ void FEditorEngine::PreInitialize()
 
 void FEditorEngine::BindHost(FWindowsWindow* InMainWindow)
 {
-	// 실제 UI/뷰포트 생성은 뒤 단계에서 하고, 여기서는 창 참조만 저장한다.
 	MainWindow = InMainWindow;
 	EditorUI.SetupWindow(InMainWindow);
 }
@@ -356,34 +374,26 @@ bool FEditorEngine::InitializeWorlds(int32 Width, int32 Height)
 
 bool FEditorEngine::InitializeMode()
 {
-	// 에디터 전용 초기화는 규약상 이 단계에서만 수행한다.
 	if (!InitEditorPreview())
 	{
 		return false;
 	}
-
 	InitEditorConsole();
-
 	if (!InitEditorCamera())
 	{
 		return false;
 	}
-
 	InitEditorViewportRouting();
 	return true;
 }
 
 void FEditorEngine::FinalizeInitialize()
 {
-	// 모드 전용 초기화가 모두 끝난 뒤 마지막 상태를 기록한다.
 	UE_LOG("EditorEngine initialized");
 	const int32 W = MainWindow ? MainWindow->GetWidth() : 800;
 	const int32 H = MainWindow ? MainWindow->GetHeight() : 600;
-
 	TArray<FViewport>& Viewports = ViewportRegistry.GetViewports();
-	FViewport* VPs[MAX_VIEWPORTS] = {
-		&Viewports[0], &Viewports[1], &Viewports[2], &Viewports[3]
-	};
+	FViewport* VPs[MAX_VIEWPORTS] = { &Viewports[0], &Viewports[1], &Viewports[2], &Viewports[3] };
 	SlateApplication = std::make_unique<FSlateApplication>();
 	SlateApplication->Initialize(FRect(0, 0, W, H), VPs, MAX_VIEWPORTS);
 	EditorUI.OnSlateReady();
@@ -433,18 +443,50 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 			}
 		}
 		bF8WasDown = bF8IsDown;
+	}
 
-		// 마우스가 캡처된 상태일 때만 PIE 카메라 조작 (자동 회전 포함)
-		if (Input && Input->IsMouseCaptured())
+	// [Possessed 상태 시점 보존 핵심]: 뷰포트 포커스 여부와 상관없이 모든 퍼스펙티브 뷰포트에 PIE 카메라를 강제 주입
+	if (IsPlayingInEditor())
+	{
+		FInputManager* Input = GetInputManager();
+		UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+		UCameraComponent* PIECamComp = PIEWorld ? PIEWorld->GetActiveCameraComponent() : nullptr;
+
+		if (Input && Input->IsMouseCaptured() && PIECamComp && PIECamComp->GetCamera())
 		{
-			// 캡처 직후 프레임은 윈도우 커서 메시지 지연으로 인해 Delta가 튈 수 있으므로 무시
-			if (bPIEJustCaptured)
+			FCamera* Cam = PIECamComp->GetCamera();
+
+			// 모든 퍼스펙티브 엔트리를 업데이트함 (첫 F8 점프 방지)
+			for (FViewportEntry& Entry : ViewportRegistry.GetEntries())
 			{
-				bPIEJustCaptured = false;
+				if (Entry.LocalState.ProjectionType == EViewportType::Perspective)
+				{
+					Entry.LocalState.Position = Cam->GetPosition();
+					Entry.LocalState.Rotation.Yaw = Cam->GetYaw();
+					Entry.LocalState.Rotation.Pitch = Cam->GetPitch();
+					Entry.LocalState.FovY = Cam->GetFOV();
+				}
 			}
-			else
+
+			if (FEditorViewportController* Controller = CameraSubsystem.GetViewportController())
 			{
-				TickPIECamera(DeltaTime);
+				if (FViewportLocalState* ActiveState = Controller->GetActiveLocalState())
+				{
+					ActiveState->Position = Cam->GetPosition();
+					ActiveState->Rotation.Yaw = Cam->GetYaw();
+					ActiveState->Rotation.Pitch = Cam->GetPitch();
+					ActiveState->FovY = Cam->GetFOV();
+				}
+			}
+
+			if (AEditorCameraPawn* EditorPawn = CameraSubsystem.GetEditorCameraPawn())
+			{
+				EditorPawn->SetActorLocation(Cam->GetPosition());
+				if (UCameraComponent* EditorCamComp = EditorPawn->GetCameraComponent())
+				{
+					EditorCamComp->GetCamera()->SetRotation(Cam->GetYaw(), Cam->GetPitch());
+					EditorCamComp->SetFov(Cam->GetFOV());
+				}
 			}
 		}
 	}
@@ -452,6 +494,48 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
 	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetLevel(), DeltaTime);
+
+	if (IsPlayingInEditor())
+	{
+		FInputManager* Input = GetInputManager();
+		UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+		UCameraComponent* PIECamComp = PIEWorld ? PIEWorld->GetActiveCameraComponent() : nullptr;
+
+		if (Input && PIECamComp && PIECamComp->GetCamera())
+		{
+			if (!Input->IsMouseCaptured())
+			{
+				// [Ejected 상태]: 에디터 조작계의 값들을 PIE 카메라에 투영
+				FViewportId FocusedId =
+					SlateApplication ? SlateApplication->GetFocusedViewportId() : INVALID_VIEWPORT_ID;
+				FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+				if (!FocusedEntry && !ViewportRegistry.GetEntries().empty())
+				{
+					FocusedEntry = &ViewportRegistry.GetEntries().front();
+				}
+
+				if (FocusedEntry)
+				{
+					FCamera* Cam = PIECamComp->GetCamera();
+					Cam->SetPosition(FocusedEntry->LocalState.Position);
+					Cam->SetRotation(FocusedEntry->LocalState.Rotation.Yaw, FocusedEntry->LocalState.Rotation.Pitch);
+					PIECamComp->SetFov(FocusedEntry->LocalState.FovY);
+				}
+			}
+			else
+			{
+				// 마우스가 캡처된 상태일 때만 PIE 카메라 조작 (자동 회전 포함)
+				if (bPIEJustCaptured)
+				{
+					bPIEJustCaptured = false;
+				}
+				else
+				{
+					TickPIECamera(DeltaTime);
+				}
+			}
+		}
+	}
 }
 
 void FEditorEngine::TickWorlds(float DeltaTime)
@@ -475,13 +559,65 @@ void FEditorEngine::RenderFrame()
 	if (!Renderer || Renderer->IsOccluded()) return;
 
 	Renderer->BeginFrame();
+	IViewportClient* ActiveClient = GetViewportClient();
 
-	// 이제 하나의 활성 클라이언트(EditorViewportClient)가 모든 분할 처리를 담당합니다!
-	if (IViewportClient* ActiveClient = GetViewportClient())
+	if (IsPlayingInEditor() && PIEViewportClient && EditorViewportClientRaw)
+	{
+		if (ActiveClient != EditorViewportClientRaw)
+		{
+			EditorViewportClientRaw->Render(this, Renderer);
+		}
+		if (!IsPlayingInEditor())
+		{
+			Renderer->EndFrame();
+			return;
+		}
+		if (ActiveClient == PIEViewportClient.get())
+		{
+			FSlateApplication* Slate = SlateApplication.get();
+			FViewportId FocusedId = Slate ? Slate->GetFocusedViewportId() : INVALID_VIEWPORT_ID;
+			FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+			if (!Entry && !ViewportRegistry.GetEntries().empty())
+			{
+				Entry = &ViewportRegistry.GetEntries().front();
+			}
+			if (Entry && Entry->Viewport)
+			{
+				const FRect& Rect = Entry->Viewport->GetRect();
+				if (Rect.Width > 0 && Rect.Height > 0)
+				{
+					UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+					if (PIEWorld)
+					{
+						if (UCameraComponent* Cam = PIEWorld->GetActiveCameraComponent())
+						{
+							if (Cam->GetCamera())
+							{
+								Cam->GetCamera()->SetAspectRatio(
+									static_cast<float>(Rect.Width) / static_cast<float>(Rect.Height));
+							}
+						}
+					}
+					D3D11_VIEWPORT VP = { static_cast<float>(Rect.X), static_cast<float>(Rect.Y),
+						static_cast<float>(Rect.Width), static_cast<float>(Rect.Height), 0.0f, 1.0f };
+					Renderer->GetDeviceContext()->RSSetViewports(1, &VP);
+					PIEViewportClient->Render(this, Renderer);
+				}
+
+				// D3D11 뷰포트를 패널 rect로 제한한 뒤 게임 씬을 렌더한다.
+				Renderer->SetRenderViewport(static_cast<float>(Rect.X), static_cast<float>(Rect.Y),
+					static_cast<float>(Rect.Width), static_cast<float>(Rect.Height), 0.0f, 1.0f);
+
+				PIEViewportClient->Render(this, Renderer);
+			}
+			Renderer->EndFrame();
+			return;
+		}
+	}
+	if (ActiveClient)
 	{
 		ActiveClient->Render(this, Renderer);
 	}
-
 	Renderer->EndFrame();
 }
 
@@ -501,7 +637,6 @@ void FEditorEngine::FlushDebugDrawForViewport(FRenderer* Renderer, const FShowFl
 	{
 		return;
 	}
-
 	if (UWorld* ActiveWorld = GetActiveWorld())
 	{
 		GetDebugDrawManager().Flush(Renderer, ShowFlags, ActiveWorld, bClearAfterFlush);
@@ -520,14 +655,14 @@ void FEditorEngine::ClearDebugDrawForFrame()
 void FEditorEngine::CreateInitUI()
 {
 	auto* RawEditorVP = static_cast<FEditorViewportClient*>(ViewportClient.get());
-	std::unique_ptr<SEditorViewportOverlay> Overlay = std::make_unique<SEditorViewportOverlay>(this, &EditorUI, RawEditorVP);
+	std::unique_ptr<SEditorViewportOverlay> Overlay =
+		std::make_unique<SEditorViewportOverlay>(this, &EditorUI, RawEditorVP);
 	SWidget* RawOverlay = SlateApplication->CreateWidget(std::move(Overlay));
 	SlateApplication->AddOverlayWidget(RawOverlay);
 }
 
 bool FEditorEngine::InitEditorPreview()
 {
-	// 에디터가 항상 접근 가능한 기본 프리뷰 월드와 프리뷰 뷰포트를 준비한다.
 	InitializeDefaultPreviewLevel(this);
 	PreviewViewportClient = std::make_unique<FPreviewViewportClient>(EditorUI, PreviewLevelContextName);
 	return PreviewViewportClient != nullptr;
@@ -536,13 +671,10 @@ bool FEditorEngine::InitEditorPreview()
 void FEditorEngine::InitEditorConsole()
 {
 	FConsoleVariableManager& CVM = FConsoleVariableManager::Get();
-
-	// 현재 등록된 콘솔 변수/명령을 UI 자동완성 목록에 반영한다.
 	CVM.GetAllNames([this](const FString& Name)
 	{
 		EditorUI.GetConsole().RegisterCommand(Name.c_str());
 	});
-
 	EditorUI.GetConsole().SetCommandHandler([](const char* CommandLine)
 	{
 		FString Result;
@@ -559,16 +691,12 @@ void FEditorEngine::InitEditorConsole()
 
 bool FEditorEngine::InitEditorCamera()
 {
-	// 에디터 카메라는 월드가 준비된 뒤에만 생성할 수 있다.
 	return CameraSubsystem.Initialize(GetActiveWorld(), GetInputManager(), GetEnhancedInputManager());
 }
 
 void FEditorEngine::InitEditorViewportRouting()
 {
-	// 초기 활성 월드가 Editor/Preview 중 무엇인지에 따라 적절한 뷰포트를 고른다.
 	SyncViewportClient();
-
-	// Perspective Entry의 LocalState를 입력 컨트롤러에 연결
 	FViewportEntry* PerspEntry = nullptr;
 	if (SlateApplication)
 	{
@@ -576,8 +704,7 @@ void FEditorEngine::InitEditorViewportRouting()
 		if (FocusedId != INVALID_VIEWPORT_ID)
 		{
 			FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
-			if (FocusedEntry &&
-				FocusedEntry->bActive &&
+			if (FocusedEntry && FocusedEntry->bActive &&
 				FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
 			{
 				PerspEntry = FocusedEntry;
@@ -596,20 +723,13 @@ void FEditorEngine::InitEditorViewportRouting()
 
 bool FEditorEngine::InitEditorWorlds(int32 Width, int32 Height)
 {
-	const float AspectRatio = (Height > 0)
-		? (static_cast<float>(Width) / static_cast<float>(Height))
-		: 1.0f;
-
+	const float AspectRatio = (Height > 0) ? (static_cast<float>(Width) / static_cast<float>(Height)) : 1.0f;
 	EditorWorldContext = CreateWorldContext("EditorLevel", EWorldType::Editor, AspectRatio, true);
 	if (!EditorWorldContext)
 	{
 		return false;
 	}
-
-	// 레벨에 CameraActor가 없으면 기본 카메라 액터를 하나 스폰한다.
-	// DefaultLevel.json에 저장된 CameraActor가 있으면 이미 로드됐으므로 중복 생성하지 않는다.
 	EnsureDefaultCameraActor();
-
 	ActivateEditorLevel();
 	return true;
 }
@@ -617,20 +737,20 @@ bool FEditorEngine::InitEditorWorlds(int32 Width, int32 Height)
 void FEditorEngine::EnsureDefaultCameraActor()
 {
 	ULevel* Level = GetEditorLevel();
-	if (!Level) return;
-
+	if (!Level)
+	{
+		return;
+	}
 	for (AActor* Actor : Level->GetActors())
 	{
 		if (Actor && Actor->IsA(ACameraActor::StaticClass()))
 		{
-			return; // 이미 존재하면 추가 생성 생략
+			return;
 		}
 	}
-
 	ACameraActor* DefaultCam = Level->SpawnActor<ACameraActor>("DefaultCameraActor");
 	if (DefaultCam)
 	{
-		// UE 기본 카메라 위치와 동일하게 설정
 		DefaultCam->SetActorLocation(FVector(-5.0f, 0.0f, 2.0f));
 		UE_LOG("[Editor] Default CameraActor spawned.");
 	}
@@ -639,13 +759,11 @@ void FEditorEngine::EnsureDefaultCameraActor()
 void FEditorEngine::ReleaseEditorWorlds()
 {
 	ActiveEditorWorldContext = nullptr;
-
 	for (FWorldContext* PreviewContext : PreviewWorldContexts)
 	{
 		DestroyWorldContext(PreviewContext);
 	}
 	PreviewWorldContexts.clear();
-
 	DestroyWorldContext(EditorWorldContext);
 	EditorWorldContext = nullptr;
 }
@@ -659,7 +777,6 @@ FWorldContext* FEditorEngine::FindPreviewWorld(const FString& ContextName)
 			return Context;
 		}
 	}
-
 	return nullptr;
 }
 
@@ -672,14 +789,12 @@ const FWorldContext* FEditorEngine::FindPreviewWorld(const FString& ContextName)
 			return Context;
 		}
 	}
-
 	return nullptr;
 }
 
 void FEditorEngine::UpdateEditorWorldAspectRatio(float AspectRatio)
 {
 	UpdateWorldAspectRatio(EditorWorldContext ? EditorWorldContext->World : nullptr, AspectRatio);
-
 	for (FWorldContext* PreviewContext : PreviewWorldContexts)
 	{
 		UpdateWorldAspectRatio(PreviewContext ? PreviewContext->World : nullptr, AspectRatio);
@@ -692,28 +807,20 @@ void FEditorEngine::SyncFocusedViewportLocalState()
 	{
 		return;
 	}
-
-	FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
-	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
-
 	if (IsPlayingInEditor())
 	{
-		// PIE 중 PIE 뷰포트에서의 우클릭 + WASD 입력은 TickPIECamera()가 전담한다.
-		// 에디터 viewport LocalState까지 입력 컨트롤러에 연결하면
-		// PIE 종료 후 에디터 시점이 같이 이동한 것처럼 보이게 된다.
-		if (FocusedId == GetPIEViewportId())
+		FInputManager* Input = GetInputManager();
+		if (Input && Input->IsMouseCaptured())
 		{
 			CameraSubsystem.GetViewportController()->SetActiveLocalState(nullptr);
 			return;
 		}
 	}
-
-	FViewportLocalState* LocalState = nullptr;
-	if (FocusedEntry && FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
-	{
-		LocalState = &FocusedEntry->LocalState;
-	}
-
+	FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
+	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+	FViewportLocalState* LocalState = (FocusedEntry && FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
+		? &FocusedEntry->LocalState
+		: nullptr;
 	CameraSubsystem.GetViewportController()->SetActiveLocalState(LocalState);
 }
 
@@ -723,18 +830,16 @@ void FEditorEngine::SyncPlatformCursor()
 	{
 		return;
 	}
-
 	const EMouseCursor SlateCursor = SlateApplication->GetCurrentCursor();
 	LPCWSTR WinCursorName = IDC_ARROW;
 	switch (SlateCursor)
 	{
-	case EMouseCursor::Default:         WinCursorName = IDC_ARROW;  break;
+	case EMouseCursor::Default: WinCursorName = IDC_ARROW; break;
 	case EMouseCursor::ResizeLeftRight: WinCursorName = IDC_SIZEWE; break;
-	case EMouseCursor::ResizeUpDown:    WinCursorName = IDC_SIZENS; break;
-	case EMouseCursor::Hand:            WinCursorName = IDC_HAND;   break;
-	case EMouseCursor::None:            WinCursorName = nullptr;    break;
+	case EMouseCursor::ResizeUpDown: WinCursorName = IDC_SIZENS; break;
+	case EMouseCursor::Hand: WinCursorName = IDC_HAND; break;
+	case EMouseCursor::None: WinCursorName = nullptr; break;
 	}
-
 	if (WinCursorName)
 	{
 		::SetCursor(::LoadCursor(NULL, WinCursorName));
@@ -751,14 +856,28 @@ void FEditorEngine::SyncViewportClient()
 	{
 		return;
 	}
-
 	IViewportClient* TargetViewportClient = ViewportClient.get();
 	const FWorldContext* ActiveLevelContext = GetActiveWorldContext();
 	if (ActiveLevelContext && ActiveLevelContext->WorldType == EWorldType::Preview && PreviewViewportClient)
 	{
 		TargetViewportClient = PreviewViewportClient.get();
 	}
-
+	else if (ActiveLevelContext && ActiveLevelContext->WorldType == EWorldType::PIE)
+	{
+		FInputManager* Input = GetInputManager();
+		if (Input && !Input->IsMouseCaptured())
+		{
+			TargetViewportClient = EditorViewportClientRaw;
+		}
+		else
+		{
+			if (!PIEViewportClient)
+			{
+				PIEViewportClient = std::make_unique<FGameViewportClient>();
+			}
+			TargetViewportClient = PIEViewportClient.get();
+		}
+	}
 	if (GetViewportClient() != TargetViewportClient)
 	{
 		SetViewportClient(TargetViewportClient);
@@ -774,38 +893,64 @@ FViewport* FEditorEngine::FindViewport(FViewportId Id)
 			return Entry.Viewport;
 		}
 	}
-
 	return nullptr;
 }
 
 void FEditorEngine::TickPIECamera(float DeltaTime)
 {
 	FInputManager* Input = GetInputManager();
-	if (!Input) return;
-
-	// 마우스가 캡처된 상태라면 우클릭 없이도 회전 가능
-	const bool bIsPossessed = Input->IsMouseCaptured();
+	if (!Input)
+	{
+		return;
+	}
 	
 	UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
-	if (!PIEWorld) return;
-
-	UCameraComponent* CamComp = PIEWorld->GetActiveCameraComponent();
-	if (!CamComp || !CamComp->GetCamera()) return;
-
-	FCamera* Camera = CamComp->GetCamera();
-
-	if (bIsPossessed)
+	if (!PIEWorld)
 	{
-		// 마우스 델타로 Yaw/Pitch 회전
-		const float Sensitivity = Camera->GetMouseSensitivity();
-		Camera->Rotate(Input->GetMouseDeltaX() * Sensitivity, -Input->GetMouseDeltaY() * Sensitivity);
+		return;
+	}
+	UCameraComponent* CamComp = PIEWorld->GetActiveCameraComponent();
+	if (!CamComp)
+	{
+		return;
+	}
+	FCamera* Camera = CamComp->GetCamera();
+	if (!Camera)
+	{
+		return;
 	}
 
-	// WASD + Q/E 로 이동
-	if (Input->IsKeyDown('W')) Camera->MoveForward(DeltaTime);
-	if (Input->IsKeyDown('S')) Camera->MoveForward(-DeltaTime);
-	if (Input->IsKeyDown('A')) Camera->MoveRight(-DeltaTime);
-	if (Input->IsKeyDown('D')) Camera->MoveRight(DeltaTime);
-	if (Input->IsKeyDown('E')) Camera->MoveUp(DeltaTime);
-	if (Input->IsKeyDown('Q')) Camera->MoveUp(-DeltaTime);
+	// 마우스가 캡처된 상태라면 우클릭 없이도 회전 가능
+	if (Input->IsMouseCaptured())
+	{
+		const float Sensitivity = Camera->GetMouseSensitivity();
+		const float DX = Input->GetMouseDeltaX();
+		const float DY = Input->GetMouseDeltaY();
+		Camera->Rotate(DX * Sensitivity, -DY * Sensitivity);
+	}
+
+	if (Input->IsKeyDown('W'))
+	{
+		Camera->MoveForward(DeltaTime);
+	}
+	if (Input->IsKeyDown('S'))
+	{
+		Camera->MoveForward(-DeltaTime);
+	}
+	if (Input->IsKeyDown('A'))
+	{
+		Camera->MoveRight(-DeltaTime);
+	}
+	if (Input->IsKeyDown('D'))
+	{
+		Camera->MoveRight(DeltaTime);
+	}
+	if (Input->IsKeyDown('E'))
+	{
+		Camera->MoveUp(DeltaTime);
+	}
+	if (Input->IsKeyDown('Q'))
+	{
+		Camera->MoveUp(-DeltaTime);
+	}
 }

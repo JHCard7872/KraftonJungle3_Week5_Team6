@@ -96,6 +96,7 @@ private:
 	void SyncViewportClient();
 
 	FEditorUI EditorUI;
+	TMap<FViewportId, FViewportLocalState> EditorCameraStatesBackup;
 	std::unique_ptr<FPreviewViewportClient> PreviewViewportClient;
 	std::unique_ptr<FGameViewportClient> PIEViewportClient;
 	FEditorSelectionSubsystem SelectionSubsystem;

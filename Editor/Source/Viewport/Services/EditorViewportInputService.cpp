@@ -31,27 +31,23 @@ void FEditorViewportInputService::TickCameraNavigation(
 		return;
 	}
 
-	bool bIsPlaying = EditorEngine->IsPlayingInEditor();
 	FInputManager* Input = Engine->GetInputManager();
-	bool bRightMouseDown = Input && Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+	if (!Input || Gizmo.IsDragging()) return;
 
-	if (ImGui::GetCurrentContext() && !bIsPlaying && !bRightMouseDown)
+	bool bIsCaptured = Input->IsMouseCaptured();
+	bool bRightMouseDown = Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+
+	// 1. Possessed 상태(마우스 캡처 중)라면 에디터 회전 로직은 작동하지 않음 (TickPIECamera가 처리)
+	if (bIsCaptured) return;
+
+	// 2. Ejected 상태(마우스 해제)라면 반드시 뷰포트 영역 내부에 마우스가 있고 우클릭 중일 때만 허용
+	if (!Slate->GetIsCoursorInArea() || !bRightMouseDown) return;
+
+	// 3. ImGui 점유 체크 (우클릭 중일 때는 조작권을 우선함)
+	if (ImGui::GetCurrentContext() && !bRightMouseDown)
 	{
 		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse)
-		{
-			return;
-		}
-	}
-
-	if (!Input || Gizmo.IsDragging())
-	{
-		return;
-	}
-
-	if (!bIsPlaying && !bRightMouseDown)
-	{
-		return;
+		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse) return;
 	}
 
 	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetFocusedViewportId());
@@ -159,18 +155,26 @@ void FEditorViewportInputService::HandleMessage(
 	if (ImGui::GetCurrentContext())
 	{
 		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureMouse)
+
+		// [중요] 마우스가 캡처된 Possessed 상태라면 ImGui의 간섭을 완전히 차단함
+		FInputManager* Input = Engine->GetInputManager();
+		bool bIsCaptured = Input && Input->IsMouseCaptured();
+
+		if (IO.WantCaptureMouse && !bIsCaptured)
 		{
-			if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
+			// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
+			if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
 			{
-				// 뷰포트 포커스를 명시적으로 해제 (파란 테두리 제거)
-				Slate->ClearFocus();
-				return;
-			}
-			
-			if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
-			{
-				return;
+				if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
+				{
+					Slate->ClearFocus();
+					return;
+				}
+
+				if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
+				{
+					return;
+				}
 			}
 		}
 	}
@@ -201,22 +205,22 @@ void FEditorViewportInputService::HandleMessage(
 		// PIE 모드일 때 실제 뷰포트 영역(Slate Area) 내부를 클릭했을 때만 마우스 캡처
 		if (bIsPlaying && Slate->GetIsCoursorInArea())
 		{
-			// 현재 어느 뷰포트가 PIE용인지 판별 (RenderAll의 로직과 동일)
-			FViewportId PIEViewportId = INVALID_VIEWPORT_ID;
+			// 현재 어느 뷰포트가 PIE용인지 판별
+			FViewportId TargetPIEId = INVALID_VIEWPORT_ID;
 			FViewportId FocusedId = Slate->GetFocusedViewportId();
 			FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
 			if (FocusedEntry && FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
 			{
-				PIEViewportId = FocusedId;
+				TargetPIEId = FocusedId;
 			}
 			else
 			{
 				FViewportEntry* PerspEntry = ViewportRegistry.FindEntryByType(EViewportType::Perspective);
-				if (PerspEntry) PIEViewportId = PerspEntry->Id;
+				if (PerspEntry) TargetPIEId = PerspEntry->Id;
 			}
 
 			// 클릭한 지점이 해당 PIE 뷰포트의 영역 내부인지 최종 확인
-			FViewport* PIEViewport = ViewportRegistry.GetViewportById(PIEViewportId);
+			FViewport* PIEViewport = ViewportRegistry.GetViewportById(TargetPIEId);
 			if (PIEViewport)
 			{
 				const FRect& Rect = PIEViewport->GetRect();
@@ -225,8 +229,9 @@ void FEditorViewportInputService::HandleMessage(
 				{
 					if (Input)
 					{
+						EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지
 						Input->SetMouseCapture(true);
-						POINT Center = { Rect.X + Rect.Width / 2, Rect.Y + Rect.Height / 2 };
+						POINT Center = { PIEViewport->GetRect().X + PIEViewport->GetRect().Width / 2, PIEViewport->GetRect().Y + PIEViewport->GetRect().Height / 2 };
 						::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
 						::SetCursorPos(Center.x, Center.y);
 						UE_LOG("[PIE] Re-captured (Possessed)");
@@ -237,6 +242,8 @@ void FEditorViewportInputService::HandleMessage(
 		break;
 	}
 	case WM_LBUTTONDBLCLK:
+		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
+		break;
 	case WM_MOUSEMOVE:
 		Slate->ProcessMouseMove(MouseX, MouseY);
 		break;
@@ -277,7 +284,7 @@ void FEditorViewportInputService::HandleMessage(
 	{
 		if (bIsPlaying)
 		{
-			if (ViewportId == EditorEngine->GetPIEViewportId())
+			if (ViewportId == PIEViewportId)
 			{
 				return EditorEngine->GetActiveLevel();
 			}
@@ -302,27 +309,12 @@ void FEditorViewportInputService::HandleMessage(
 
 		switch (WParam)
 		{
-		case 'W':
-			Gizmo.SetMode(EGizmoMode::Location);
-			return;
-		case 'E':
-			Gizmo.SetMode(EGizmoMode::Rotation);
-			return;
-		case 'R':
-			Gizmo.SetMode(EGizmoMode::Scale);
-			return;
-		case 'L':
-			Gizmo.ToggleCoordinateSpace();
-			UE_LOG("Gizmo Space: %s", Gizmo.GetCoordinateSpace() == EGizmoCoordinateSpace::Local ? "Local" : "World");
-			return;
-		case VK_SPACE:
-			Gizmo.CycleMode();
-			UE_LOG("Gizmo Mode: %s",
-				Gizmo.GetMode() == EGizmoMode::Location ? "Location" :
-				Gizmo.GetMode() == EGizmoMode::Rotation ? "Rotation" : "Scale");
-			return;
-		default:
-			return;
+		case 'W': Gizmo.SetMode(EGizmoMode::Location); return;
+		case 'E': Gizmo.SetMode(EGizmoMode::Rotation); return;
+		case 'R': Gizmo.SetMode(EGizmoMode::Scale); return;
+		case 'L': Gizmo.ToggleCoordinateSpace(); return;
+		case VK_SPACE: Gizmo.CycleMode(); return;
+		default: return;
 		}
 	}
 
@@ -335,18 +327,6 @@ void FEditorViewportInputService::HandleMessage(
 			return;
 		}
 
-		// [수정] Ejected 상태에서 PIE 뷰포트를 클릭하면 다시 캡처(Possess) 모드로 진입
-		if (bIsPlaying && !bIsCaptured && FocusedId == PIEViewportId)
-		{
-			EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지
-			Input->SetMouseCapture(true);
-			POINT Center = { Viewport->GetRect().X + Viewport->GetRect().Width / 2, Viewport->GetRect().Y + Viewport->GetRect().Height / 2 };
-			::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
-			::SetCursorPos(Center.x, Center.y);
-			UE_LOG("[PIE] Re-captured (Possessed)");
-			return;
-		}
-
 		ULevel* Level = GetLevelForViewport(FocusedId);
 		if (!Level)
 		{
@@ -355,8 +335,6 @@ void FEditorViewportInputService::HandleMessage(
 
 		FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(FocusedId);
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -367,10 +345,7 @@ void FEditorViewportInputService::HandleMessage(
 
 		AActor* PickedActor = Picker.PickActor(Level, Entry, ScreenMouseX, ScreenMouseY);
 		EditorEngine->SetSelectedActor(PickedActor);
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 
@@ -392,8 +367,6 @@ void FEditorViewportInputService::HandleMessage(
 
 		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -412,10 +385,7 @@ void FEditorViewportInputService::HandleMessage(
 
 	case WM_LBUTTONUP:
 	{
-		if (!Gizmo.IsDragging())
-		{
-			return;
-		}
+		if (!Gizmo.IsDragging()) return;
 
 		Gizmo.EndDrag();
 		FViewportId HoveredId = Slate->GetHoveredViewportId();
@@ -424,21 +394,13 @@ void FEditorViewportInputService::HandleMessage(
 		{
 			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 			const FRect& Rect = Viewport->GetRect();
-			ScreenWidth = Rect.Width;
-			ScreenHeight = Rect.Height;
 			ScreenMouseX = MouseX - Rect.X;
 			ScreenMouseY = MouseY - Rect.Y;
 			Gizmo.UpdateHover(SelectedActor, HoveredEntry, Picker, ScreenMouseX, ScreenMouseY);
 		}
-		else
-		{
-			Gizmo.ClearHover();
-		}
+		else Gizmo.ClearHover();
 
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 
