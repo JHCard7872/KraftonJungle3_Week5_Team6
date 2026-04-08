@@ -31,27 +31,23 @@ void FEditorViewportInputService::TickCameraNavigation(
 		return;
 	}
 
-	bool bIsPlaying = EditorEngine->IsPlayingInEditor();
 	FInputManager* Input = Engine->GetInputManager();
-	bool bRightMouseDown = Input && Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+	if (!Input || Gizmo.IsDragging()) return;
 
-	if (ImGui::GetCurrentContext() && !bIsPlaying && !bRightMouseDown)
+	bool bIsCaptured = Input->IsMouseCaptured();
+	bool bRightMouseDown = Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
+
+	// 1. Possessed 상태(마우스 캡처 중)라면 에디터 회전 로직은 작동하지 않음 (TickPIECamera가 처리)
+	if (bIsCaptured) return;
+
+	// 2. Ejected 상태(마우스 해제)라면 반드시 뷰포트 영역 내부에 마우스가 있고 우클릭 중일 때만 허용
+	if (!Slate->GetIsCoursorInArea() || !bRightMouseDown) return;
+
+	// 3. ImGui 점유 체크 (우클릭 중일 때는 조작권을 우선함)
+	if (ImGui::GetCurrentContext() && !bRightMouseDown)
 	{
 		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse)
-		{
-			return;
-		}
-	}
-
-	if (!Input || Gizmo.IsDragging())
-	{
-		return;
-	}
-
-	if (!bIsPlaying && !bRightMouseDown)
-	{
-		return;
+		if (IO.WantCaptureKeyboard || IO.WantCaptureMouse) return;
 	}
 
 	FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetFocusedViewportId());
@@ -154,26 +150,33 @@ void FEditorViewportInputService::HandleMessage(
 	{
 		return;
 	}
+// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
+if (ImGui::GetCurrentContext())
+{
+	const ImGuiIO& IO = ImGui::GetIO();
 
-	// 최상단에서 ImGui 점유 확인 (다른 패널 클릭 시 뷰포트 로직 차단 및 포커스 해제)
-	if (ImGui::GetCurrentContext())
+	// [중요] 마우스가 캡처된 Possessed 상태라면 ImGui의 간섭을 완전히 차단함
+	FInputManager* Input = Engine->GetInputManager();
+	bool bIsCaptured = Input && Input->IsMouseCaptured();
+
+	if (IO.WantCaptureMouse && !bIsCaptured)
 	{
-		const ImGuiIO& IO = ImGui::GetIO();
-		if (IO.WantCaptureMouse)
+		// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
+		if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
 		{
 			if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
 			{
-				// 뷰포트 포커스를 명시적으로 해제 (파란 테두리 제거)
 				Slate->ClearFocus();
 				return;
 			}
-			
+
 			if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
 			{
 				return;
 			}
 		}
 	}
+}
 
 	const int32 MouseX = static_cast<int32>(static_cast<short>(LOWORD(LParam)));
 	const int32 MouseY = static_cast<int32>(static_cast<short>(HIWORD(LParam)));
@@ -182,28 +185,13 @@ void FEditorViewportInputService::HandleMessage(
 	{
 	case WM_LBUTTONDOWN:
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// PIE 모드일 때 실제 뷰포트 영역(Slate Area) 내부를 클릭했을 때만 마우스 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
-		{
-			if (FInputManager* Input = Engine->GetInputManager())
-			{
-				Input->SetMouseCapture(true);
-			}
-		}
+		// [언리얼 표준]: 클릭 시 자동 포제션 제거 (오직 F8로만 전환)
 		break;
 	case WM_LBUTTONDBLCLK:
 		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
 		return;
 	case WM_RBUTTONDOWN:
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// 우클릭 시에도 동일하게 뷰포트 영역 내부인지 확인 후 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
-		{
-			if (FInputManager* Input = Engine->GetInputManager())
-			{
-				Input->SetMouseCapture(true);
-			}
-		}
 		break;
 	case WM_MOUSEMOVE:
 		Slate->ProcessMouseMove(MouseX, MouseY);
@@ -261,41 +249,21 @@ void FEditorViewportInputService::HandleMessage(
 
 		switch (WParam)
 		{
-		case 'W':
-			Gizmo.SetMode(EGizmoMode::Location);
-			return;
-		case 'E':
-			Gizmo.SetMode(EGizmoMode::Rotation);
-			return;
-		case 'R':
-			Gizmo.SetMode(EGizmoMode::Scale);
-			return;
-		case 'L':
-			Gizmo.ToggleCoordinateSpace();
-			UE_LOG("Gizmo Space: %s", Gizmo.GetCoordinateSpace() == EGizmoCoordinateSpace::Local ? "Local" : "World");
-			return;
-		case VK_SPACE:
-			Gizmo.CycleMode();
-			UE_LOG("Gizmo Mode: %s",
-				Gizmo.GetMode() == EGizmoMode::Location ? "Location" :
-				Gizmo.GetMode() == EGizmoMode::Rotation ? "Rotation" : "Scale");
-			return;
-		default:
-			return;
+		case 'W': Gizmo.SetMode(EGizmoMode::Location); return;
+		case 'E': Gizmo.SetMode(EGizmoMode::Rotation); return;
+		case 'R': Gizmo.SetMode(EGizmoMode::Scale); return;
+		case 'L': Gizmo.ToggleCoordinateSpace(); return;
+		case VK_SPACE: Gizmo.CycleMode(); return;
+		default: return;
 		}
 	}
 
 	case WM_LBUTTONDOWN:
 	{
 		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetFocusedViewportId());
-		if (!Viewport)
-		{
-			return;
-		}
+		if (!Viewport) return;
 
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -306,10 +274,7 @@ void FEditorViewportInputService::HandleMessage(
 
 		AActor* PickedActor = Picker.PickActor(Level, Entry, ScreenMouseX, ScreenMouseY);
 		EditorEngine->SetSelectedActor(PickedActor);
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 
@@ -324,8 +289,6 @@ void FEditorViewportInputService::HandleMessage(
 
 		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -344,10 +307,7 @@ void FEditorViewportInputService::HandleMessage(
 
 	case WM_LBUTTONUP:
 	{
-		if (!Gizmo.IsDragging())
-		{
-			return;
-		}
+		if (!Gizmo.IsDragging()) return;
 
 		Gizmo.EndDrag();
 		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
@@ -355,21 +315,13 @@ void FEditorViewportInputService::HandleMessage(
 		{
 			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
 			const FRect& Rect = Viewport->GetRect();
-			ScreenWidth = Rect.Width;
-			ScreenHeight = Rect.Height;
 			ScreenMouseX = MouseX - Rect.X;
 			ScreenMouseY = MouseY - Rect.Y;
 			Gizmo.UpdateHover(SelectedActor, HoveredEntry, Picker, ScreenMouseX, ScreenMouseY);
 		}
-		else
-		{
-			Gizmo.ClearHover();
-		}
+		else Gizmo.ClearHover();
 
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 

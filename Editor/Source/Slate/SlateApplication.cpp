@@ -337,7 +337,7 @@ void FSlateApplication::BringOverlayWidgetToFront(SWidget* Widget)
 // ────────────────────────────────────────────────────────────
 // Mouse input
 // ────────────────────────────────────────────────────────────
-void FSlateApplication::ProcessMouseDown(int32 X, int32 Y)
+bool FSlateApplication::ProcessMouseDown(int32 X, int32 Y)
 {
 	const FPoint Point{ X, Y };
 
@@ -352,7 +352,7 @@ void FSlateApplication::ProcessMouseDown(int32 X, int32 Y)
 		if (W->OnMouseDown(X, Y))
 		{
 			BringOverlayWidgetToFront(W);
-			return;
+			return true;
 		}
 	}
 	// Splitter 바 히트 우선
@@ -366,7 +366,7 @@ void FSlateApplication::ProcessMouseDown(int32 X, int32 Y)
 			Bar.Y <= Y && Y <= Bar.Y + Bar.Height)
 		{
 			DraggingSplitter = S;
-			return;
+			return true;
 		}
 	}
 
@@ -376,9 +376,11 @@ void FSlateApplication::ProcessMouseDown(int32 X, int32 Y)
 		if (Viewports[i] && Viewports[i]->HitTest(X, Y))
 		{
 			FocusedViewportId = Viewports[i]->Id;
-			return;
+			return false;
 		}
 	}
+
+	return false;
 }
 
 void FSlateApplication::ProcessMouseDoubleClick(int32 X, int32 Y)
