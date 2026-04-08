@@ -40,8 +40,8 @@ void FEditorViewportInputService::TickCameraNavigation(
 	// 1. Possessed 상태(마우스 캡처 중)라면 에디터 회전 로직은 작동하지 않음 (TickPIECamera가 처리)
 	if (bIsCaptured) return;
 
-	// 2. Ejected 상태(마우스 해제)라면 반드시 뷰포트에 포커스가 있고 우클릭 중일 때만 허용
-	if (Slate->GetFocusedViewportId() == INVALID_VIEWPORT_ID || !bRightMouseDown) return;
+	// 2. Ejected 상태(마우스 해제)라면 반드시 뷰포트 영역 내부에 마우스가 있고 우클릭 중일 때만 허용
+	if (!Slate->GetIsCoursorInArea() || !bRightMouseDown) return;
 
 	// 3. ImGui 점유 체크 (우클릭 중일 때는 조작권을 우선함)
 	if (ImGui::GetCurrentContext() && !bRightMouseDown)
@@ -162,7 +162,6 @@ void FEditorViewportInputService::HandleMessage(
 			{
 				if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
 				{
-					// 뷰포트 포커스를 명시적으로 해제 (파란 테두리 제거)
 					Slate->ClearFocus();
 					return;
 				}
@@ -182,7 +181,7 @@ void FEditorViewportInputService::HandleMessage(
 	{
 	case WM_LBUTTONDOWN:
 		Slate->ProcessMouseDown(MouseX, MouseY);
-		// 좌클릭 시 자동 캡처 로직 제거 (오직 F8로만 제어)
+		// [언리얼 표준]: 클릭 시 자동 포제션 제거 (오직 F8로만 전환)
 		break;
 	case WM_LBUTTONDBLCLK:
 		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
@@ -246,41 +245,21 @@ void FEditorViewportInputService::HandleMessage(
 
 		switch (WParam)
 		{
-		case 'W':
-			Gizmo.SetMode(EGizmoMode::Location);
-			return;
-		case 'E':
-			Gizmo.SetMode(EGizmoMode::Rotation);
-			return;
-		case 'R':
-			Gizmo.SetMode(EGizmoMode::Scale);
-			return;
-		case 'L':
-			Gizmo.ToggleCoordinateSpace();
-			UE_LOG("Gizmo Space: %s", Gizmo.GetCoordinateSpace() == EGizmoCoordinateSpace::Local ? "Local" : "World");
-			return;
-		case VK_SPACE:
-			Gizmo.CycleMode();
-			UE_LOG("Gizmo Mode: %s",
-				Gizmo.GetMode() == EGizmoMode::Location ? "Location" :
-				Gizmo.GetMode() == EGizmoMode::Rotation ? "Rotation" : "Scale");
-			return;
-		default:
-			return;
+		case 'W': Gizmo.SetMode(EGizmoMode::Location); return;
+		case 'E': Gizmo.SetMode(EGizmoMode::Rotation); return;
+		case 'R': Gizmo.SetMode(EGizmoMode::Scale); return;
+		case 'L': Gizmo.ToggleCoordinateSpace(); return;
+		case VK_SPACE: Gizmo.CycleMode(); return;
+		default: return;
 		}
 	}
 
 	case WM_LBUTTONDOWN:
 	{
 		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetFocusedViewportId());
-		if (!Viewport)
-		{
-			return;
-		}
+		if (!Viewport) return;
 
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -291,10 +270,7 @@ void FEditorViewportInputService::HandleMessage(
 
 		AActor* PickedActor = Picker.PickActor(Level, Entry, ScreenMouseX, ScreenMouseY);
 		EditorEngine->SetSelectedActor(PickedActor);
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 
@@ -309,8 +285,6 @@ void FEditorViewportInputService::HandleMessage(
 
 		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
 		const FRect& Rect = Viewport->GetRect();
-		ScreenWidth = Rect.Width;
-		ScreenHeight = Rect.Height;
 		ScreenMouseX = MouseX - Rect.X;
 		ScreenMouseY = MouseY - Rect.Y;
 
@@ -329,10 +303,7 @@ void FEditorViewportInputService::HandleMessage(
 
 	case WM_LBUTTONUP:
 	{
-		if (!Gizmo.IsDragging())
-		{
-			return;
-		}
+		if (!Gizmo.IsDragging()) return;
 
 		Gizmo.EndDrag();
 		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
@@ -340,21 +311,13 @@ void FEditorViewportInputService::HandleMessage(
 		{
 			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
 			const FRect& Rect = Viewport->GetRect();
-			ScreenWidth = Rect.Width;
-			ScreenHeight = Rect.Height;
 			ScreenMouseX = MouseX - Rect.X;
 			ScreenMouseY = MouseY - Rect.Y;
 			Gizmo.UpdateHover(SelectedActor, HoveredEntry, Picker, ScreenMouseX, ScreenMouseY);
 		}
-		else
-		{
-			Gizmo.ClearHover();
-		}
+		else Gizmo.ClearHover();
 
-		if (OnSelectionChanged)
-		{
-			OnSelectionChanged();
-		}
+		if (OnSelectionChanged) OnSelectionChanged();
 		return;
 	}
 
