@@ -57,8 +57,12 @@ void UWorld::BeginPlay()
 
 void UWorld::Tick(float InDeltaTime)
 {
-	DeltaSeconds = InDeltaTime;
-	WorldTime += InDeltaTime;
+	if (bIsPaused) return;
+
+	float ScaledDeltaTime = InDeltaTime * TimeScale;
+
+	DeltaSeconds = ScaledDeltaTime;
+	WorldTime += ScaledDeltaTime;
 
 	if (PersistentLevel)
 	{

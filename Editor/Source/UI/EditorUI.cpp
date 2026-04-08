@@ -30,6 +30,7 @@
 #include "Component/SubUVComponent.h"
 #include "Component/UUIDBillboardComponent.h"
 #include "Component/BillboardComponent.h"
+#include "Input/InputManager.h"
 
 enum class EFileDialogType
 {
@@ -923,14 +924,26 @@ void FEditorUI::Render()
 			if (bIsPlaying)
 			{
 				ImGui::SameLine(0, 10.0f);
-				bool bIsPaused = Engine->IsPaused();
+				UWorld* ActiveWorld = Engine->GetActiveWorld();
+				bool bIsPaused = ActiveWorld ? ActiveWorld->IsPaused() : false;
+
 				const char* PauseLabel = bIsPaused ? "Resume" : "Pause";
 				ImVec4 PauseColor = bIsPaused ? ImVec4(0.2f, 0.6f, 0.8f, 1.0f) : ImVec4(0.8f, 0.6f, 0.2f, 1.0f);
 				
 				ImGui::PushStyleColor(ImGuiCol_Button, PauseColor);
 				if (ImGui::Button(PauseLabel, ImVec2(ButtonWidth, 0)))
 				{
-					Engine->SetPaused(!bIsPaused);
+					if (ActiveWorld)
+					{
+						ActiveWorld->SetPaused(!bIsPaused);
+						if (bIsPaused)
+						{
+							if (auto* Input = Engine->GetInputManager())
+							{
+								Input->SetMouseCapture(!Input->IsMouseCaptured());
+							}
+						}
+					}
 				}
 				ImGui::PopStyleColor(1);
 			}

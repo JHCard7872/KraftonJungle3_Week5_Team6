@@ -47,6 +47,17 @@ UObject* FObjectFactory::ConstructObject(
 	return ConstructObject(Params);
 }
 
+void FObjectFactory::RegisterClonedObject(UObject* NewObj)
+{
+	if (!NewObj) return;
+	NewObj->UUID = GenerateUUID();
+
+	NewObj->InternalIndex = static_cast<uint32>(GUObjectArray.size());
+	GUObjectArray.push_back(NewObj);
+
+	GUUIDToObjectMap[NewObj->UUID] = NewObj;
+}
+
 uint32 FObjectFactory::GetLastUUID()
 {
 	return LastUUID;

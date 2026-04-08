@@ -167,7 +167,7 @@ void FEditorEngine::EndPIE()
 
 	UE_LOG("[PIE] Play In Editor Stopped.");
 
-	bIsPaused = false; // ⭐ 종료 시 일시정지 해제
+	GetActiveWorld()->SetPaused(false);
 
 	// 마우스 캡처 해제
 	if (FInputManager* Input = GetInputManager())
@@ -391,35 +391,29 @@ void FEditorEngine::FinalizeInitialize()
 
 void FEditorEngine::PrepareFrame(float DeltaTime)
 {
+	FInputManager* Input = GetInputManager();
+	if (!Input) return;
+
 	if (IsPlayingInEditor())
 	{
-		if (::GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+		if (Input->IsKeyDown(VK_ESCAPE))
 		{
 			EndPIE();
+			return;
 		}
-
-		// F8: Possess/Eject 토글
-		static bool bF8WasDown = false;
-		bool bF8IsDown = (::GetAsyncKeyState(VK_F8) & 0x8000) != 0;
-		if (bF8IsDown && !bF8WasDown)
+		if (Input->IsKeyPressed(VK_F8))
 		{
-			if (FInputManager* Input = GetInputManager())
+			Input->SetMouseCapture(!Input->IsMouseCaptured());
+			UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
+		}
+		if (Input->IsKeyPressed('P'))
+		{
+			if (UWorld* ActiveWorld = GetActiveWorld())
 			{
-				Input->SetMouseCapture(!Input->IsMouseCaptured());
-				UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
+				ActiveWorld->SetPaused(!ActiveWorld->IsPaused());
+				UE_LOG("[PIE] %s", ActiveWorld->IsPaused() ? "Paused" : "Resumed");
 			}
 		}
-		bF8WasDown = bF8IsDown;
-
-		// P: Pause/Resume 토글
-		static bool bPWasDown = false;
-		bool bPIsDown = (::GetAsyncKeyState('P') & 0x8000) != 0;
-		if (bPIsDown && !bPWasDown)
-		{
-			bIsPaused = !bIsPaused;
-			UE_LOG("[PIE] %s", bIsPaused ? "Paused" : "Resumed");
-		}
-		bPWasDown = bPIsDown;
 	}
 
 	SyncViewportClient();
@@ -428,16 +422,7 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 
 	if (IsPlayingInEditor())
 	{
-		// ESC로 PIE 종료
-		FInputManager* Input = GetInputManager();
-		if (Input && Input->IsKeyDown(VK_ESCAPE))
-		{
-			EndPIE();
-			return;
-		}
-
-		// PIE 중 우클릭 + WASD/마우스로 카메라 이동
-		if (!bIsPaused)
+		if (UWorld* ActiveWorld = GetActiveWorld(); ActiveWorld && !ActiveWorld->IsPaused())
 		{
 			TickPIECamera(DeltaTime);
 		}
@@ -448,12 +433,6 @@ void FEditorEngine::TickWorlds(float DeltaTime)
 {
 	if (UWorld* ActiveWorld = GetActiveWorld())
 	{
-		// PIE 중이고 일시정지 상태라면 틱을 건너뜀 (단, 에디터 월드 등은 영향을 받지 않도록 함)
-		if (IsPlayingInEditor() && bIsPaused && ActiveWorld->GetWorldType() == EWorldType::PIE)
-		{
-			return;
-		}
-
 		ActiveWorld->Tick(DeltaTime);
 	}
 }
@@ -526,14 +505,8 @@ void FEditorEngine::RenderFrame()
 				}
 
 				// D3D11 뷰포트를 패널 rect로 제한한 뒤 게임 씬을 렌더한다.
-				D3D11_VIEWPORT VP = {};
-				VP.TopLeftX = static_cast<float>(Rect.X);
-				VP.TopLeftY = static_cast<float>(Rect.Y);
-				VP.Width = static_cast<float>(Rect.Width);
-				VP.Height = static_cast<float>(Rect.Height);
-				VP.MinDepth = 0.0f;
-				VP.MaxDepth = 1.0f;
-				Renderer->GetDeviceContext()->RSSetViewports(1, &VP);
+				Renderer->SetRenderViewport(static_cast<float>(Rect.X), static_cast<float>(Rect.Y),
+					static_cast<float>(Rect.Width), static_cast<float>(Rect.Height), 0.0f, 1.0f);
 
 				PIEViewportClient->Render(this, Renderer);
 			}

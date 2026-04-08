@@ -334,18 +334,6 @@ void AActor::FixupReferences(const FDuplicateionContext& Context)
 	}
 }
 
-void AActor::CopyPropertiesFrom(const UObject* Source)
-{
-	UObject::CopyPropertiesFrom(Source);
-	const AActor* SourceActor = static_cast<const AActor*>(Source);
-
-	this->bCanEverTick = SourceActor->bCanEverTick;
-	this->bTickEnabled = SourceActor->bTickEnabled;
-	this->bVisible = SourceActor->bVisible;
-
-	this->RootComponent = SourceActor->RootComponent;
-	this->OwnedComponents = SourceActor->OwnedComponents;
-}
 
 void AActor::DuplicateSubObjects(FDuplicateionContext& Context)
 {
@@ -353,6 +341,7 @@ void AActor::DuplicateSubObjects(FDuplicateionContext& Context)
 
 	TArray<UActorComponent*> OldComponents = this->OwnedComponents;
 	this->OwnedComponents.clear();
+	this->RootComponent = nullptr;
 
 	for (UActorComponent* OldComp : OldComponents)
 	{
