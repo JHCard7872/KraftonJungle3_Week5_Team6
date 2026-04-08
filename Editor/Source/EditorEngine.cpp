@@ -74,7 +74,14 @@ void FEditorEngine::StartPIE()
 {
 	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World) return;
 
-	UE_LOG("[PIE] Play In Editor Started.");
+	UE_LOG("[PIE] Play In Editor Started. Click Viewport to capture mouse.");
+
+	// PIE 시작 시 에디터 카메라 상태 백업
+	EditorCameraStatesBackup.clear();
+	for (FViewportEntry& Entry : ViewportRegistry.GetEntries())
+	{
+		EditorCameraStatesBackup[Entry.Id] = Entry.LocalState;
+	}
 
 	// 현재 에디터 카메라 정보 저장
 	FVector EditorCamPos;
@@ -114,11 +121,7 @@ void FEditorEngine::StartPIE()
 	PIEWorld->BeginPlay();
 	SyncViewportClient();
 
-	// 마우스 캡처 시작
-	if (FInputManager* Input = GetInputManager())
-	{
-		Input->SetMouseCapture(true);
-	}
+	// 마우스 캡처는 뷰포트 클릭 시 발생하도록 유도 (언리얼 스타일)
 }
 
 void FEditorEngine::EndPIE()
@@ -146,6 +149,16 @@ void FEditorEngine::EndPIE()
 		DestroyWorldContext(PIEWorldContext);
 		PIEWorldContext = nullptr;
 	}
+
+	// PIE 종료 시 에디터 카메라 상태 복구
+	for (auto& Pair : EditorCameraStatesBackup)
+	{
+		if (FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(Pair.first))
+		{
+			Entry->LocalState = Pair.second;
+		}
+	}
+	EditorCameraStatesBackup.clear();
 
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
