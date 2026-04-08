@@ -15,6 +15,9 @@ void UBillboardComponent::PostConstruct()
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
 	MaterialInstance = FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial();
+
+	SetSpriteTexture(nullptr);
+
 }
 
 FBoxSphereBounds UBillboardComponent::GetWorldBounds() const

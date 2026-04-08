@@ -1,5 +1,6 @@
 #include "Material.h"
 #include "Shader.h"
+#include "MaterialManager.h"
 #include <cstring>
 
 

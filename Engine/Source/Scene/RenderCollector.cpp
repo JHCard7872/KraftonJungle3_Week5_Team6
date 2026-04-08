@@ -181,7 +181,8 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 			{
 				BillboardMesh->bIsDirty = true;
 				FMaterial* BillboardMat = BillboardComp->GetMaterialInstance();
-				if (BillboardMat)
+
+				if (BillboardMat && BillboardMat->GetMaterialTexture())
 				{
 					FRenderCommand Command;
 					Command.RenderMesh = BillboardMesh;
