@@ -6,6 +6,7 @@
 #include "UI/EditorUI.h"
 #include "Viewport/EditorViewportRegistry.h"
 #include "Viewport/PreviewViewportClient.h"
+#include "Core/GameViewportClient.h"
 #include "Slate/SlateApplication.h"
 
 class AActor;
@@ -47,6 +48,10 @@ public:
 	void ClearDebugDrawForFrame();
 	void CreateInitUI();
 
+	/** 에디터 레벨에 CameraActor가 없을 때 기본 카메라 액터를 하나 스폰한다. */
+	void EnsureDefaultCameraActor();
+	void TickPIECamera(float DeltaTime);
+
 protected:
 	void PreInitialize() override;
 	// 에디터 UI가 나중에 사용할 메인 창 참조만 저장한다.
@@ -76,6 +81,7 @@ private:
 	void InitEditorViewportRouting();
 	bool InitEditorWorlds(int32 Width, int32 Height);
 	void ReleaseEditorWorlds();
+	
 	FWorldContext* FindPreviewWorld(const FString& ContextName);
 	const FWorldContext* FindPreviewWorld(const FString& ContextName) const;
 	void UpdateEditorWorldAspectRatio(float AspectRatio);
@@ -86,6 +92,7 @@ private:
 	FEditorUI EditorUI;
 	TMap<FViewportId, FViewportLocalState> EditorCameraStatesBackup;
 	std::unique_ptr<FPreviewViewportClient> PreviewViewportClient;
+	std::unique_ptr<FGameViewportClient> PIEViewportClient;
 	FEditorSelectionSubsystem SelectionSubsystem;
 	FEditorCameraSubsystem CameraSubsystem;
 	FWorldContext* EditorWorldContext = nullptr;

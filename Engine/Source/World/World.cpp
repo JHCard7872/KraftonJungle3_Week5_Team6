@@ -151,9 +151,13 @@ void UWorld::DuplicateSubObjects(FDuplicateionContext& Context)
 		}
 	}
 
+	// LevelCameraComponent는 World가 소유하는 subobject이므로 매핑이 아닌 실제 duplicate를 해야함.
+	// GetMappedObject만 호출하면 Context에 등록된 적 없는 포인터라 원본(에디터 카메라)을 그대로 반환해
+	// PIE 월드가 에디터 카메라 인스턴스를 공유하게 됨.
 	if(this->LevelCameraComponent)
 	{
-		this->LevelCameraComponent = static_cast<UCameraComponent*>(Context.GetMappedObject(this->LevelCameraComponent));
+		//this->LevelCameraComponent = static_cast<UCameraComponent*>(Context.GetMappedObject(this->LevelCameraComponent));
+		this->LevelCameraComponent = static_cast<UCameraComponent*>(this->LevelCameraComponent->Duplicate(Context, this));
 	}
 }
 

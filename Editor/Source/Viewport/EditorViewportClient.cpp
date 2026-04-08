@@ -33,13 +33,22 @@ void FEditorViewportClient::Attach(FEngine* Engine, FRenderer* Renderer)
 	}
 
 	EditorUI.Initialize(EditorEngine);
-	EditorUI.AttachToRenderer(Renderer);
+	EditorUI.AttachToRenderer(Renderer); // bViewportClientActive 가드: 이미 활성이면 no-op
 
-	BlitRenderer.Initialize(Renderer->GetDevice());
+	// PIE 전환 후 복귀 시 Detach가 리소스를 해제하지 않으므로
+	// GridMesh가 이미 있으면 재생성하지 않는다.
+	if (!GridMesh)
+	{
+		BlitRenderer.Initialize(Renderer->GetDevice());
+		WireFrameMaterial = FMaterialManager::Get().FindByName(WireframeMaterialName);
+		CreateGridResource(Renderer);
+	}
 
-	// Cache wireframe material for wireframe view mode.
-	WireFrameMaterial = FMaterialManager::Get().FindByName(WireframeMaterialName);
-	CreateGridResource(Renderer);
+	//BlitRenderer.Initialize(Renderer->GetDevice());
+
+	//// Cache wireframe material for wireframe view mode.
+	//WireFrameMaterial = FMaterialManager::Get().FindByName(WireframeMaterialName);
+	//CreateGridResource(Renderer);
 }
 
 void FEditorViewportClient::CreateGridResource(FRenderer* Renderer)
@@ -110,7 +119,14 @@ void FEditorViewportClient::CreateGridResource(FRenderer* Renderer)
 void FEditorViewportClient::Detach(FEngine* Engine, FRenderer* Renderer)
 {
 	Gizmo.EndDrag();
-	EditorUI.DetachFromRenderer(Renderer);
+
+	// PIE 전환 시에도 Detach가 호출되는데, DetachFromRenderer → ClearViewportCallbacks →
+	// GUIShutdown() → ImGui::DestroyContext() 순서로 실행되어 GImGui = nullptr가 된다.
+	// 이 시점은 아직 ImGui 프레임이 진행 중(Button 콜백 내부)이므로 즉시 크래시한다.
+	// → DetachFromRenderer 호출을 제거한다. ImGui 컨텍스트는 에디터 수명 동안 유지된다.
+	// → Attach 재호출 시 AttachToRenderer의 bViewportClientActive 가드가 중복 초기화를 막는다.
+	// 그래픽 리소스(BlitRenderer, Grid)는 해제해두고 Attach에서 재생성한다.
+	//EditorUI.DetachFromRenderer(Renderer);
 
 	BlitRenderer.Release();
 
