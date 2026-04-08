@@ -11,8 +11,10 @@
 #include "Renderer/TextMeshBuilder.h"
 #include "Renderer/SubUVRenderer.h"
 #include "Renderer/Material.h"
+#include "Renderer/MaterialManager.h"
 #include "Renderer/MeshData.h"
 #include "Component/BillboardComponent.h"
+#include "Component/CameraArrowComponent.h"
 
 void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors, const FFrustum& Frustum,
 	const FShowFlags& ShowFlags, const FVector& CameraPosition, FRenderCommandQueue& OutQueue)
@@ -171,6 +173,23 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 			continue;
 		}
 
+		// ─── 4. 카메라 방향 화살표 컴포넌트 ───
+		if (Comp->IsA(UCameraArrowComponent::StaticClass()))
+		{
+			UCameraArrowComponent* ArrowComp = static_cast<UCameraArrowComponent*>(Comp);
+			FDynamicMesh* ArrowMesh = ArrowComp->GetArrowMesh();
+			if (ArrowMesh && !ArrowMesh->Vertices.empty())
+			{
+				auto GizmoMat = FMaterialManager::Get().FindByName("M_Gizmos");
+				FRenderCommand Command;
+				Command.RenderMesh = ArrowMesh;
+				Command.Material = GizmoMat ? GizmoMat.get() : Renderer->GetDefaultMaterial();
+				Command.WorldMatrix = ArrowComp->GetWorldTransform();
+				OutQueue.AddCommand(Command);
+			}
+			continue;
+		}
+
 		if (Comp->IsA(UBillboardComponent::StaticClass()))
 		{
 			UBillboardComponent* BillboardComp = static_cast<UBillboardComponent*>(Comp);
@@ -218,10 +237,17 @@ void FLevelRenderCollector::FrustrumCull(const TArray<AActor*>& Actors, const FF
 			const bool bIsUUID = PrimitiveComponent->IsA(UUUIDBillboardComponent::StaticClass());
 			const bool bIsSubUV = PrimitiveComponent->IsA(USubUVComponent::StaticClass());
 			const bool bIsText = PrimitiveComponent->IsA(UTextRenderComponent::StaticClass());
+			const bool bIsCameraArrow = PrimitiveComponent->IsA(UCameraArrowComponent::StaticClass());
 			// ─── ShowFlags에 따른 필터링 ───
 			if (bIsUUID)
 			{
 				if (!ShowFlags.HasFlag(EEngineShowFlags::SF_UUID)) continue;
+			}
+			else if (bIsCameraArrow)
+			{
+				// 에디터 전용 – PIE(SF_EditorActorVisualization 꺼짐)에서는 스킵
+				if (!ShowFlags.HasFlag(EEngineShowFlags::SF_EditorActorVisualization)) continue;
+				if (!PrimitiveComponent->GetRenderMesh()) continue;
 			}
 			else if (bIsSubUV)
 			{
@@ -239,7 +265,23 @@ void FLevelRenderCollector::FrustrumCull(const TArray<AActor*>& Actors, const FF
 			}
 			else
 			{
-				if (!ShowFlags.HasFlag(EEngineShowFlags::SF_Primitives)) continue;
+				// Billboard 중 에디터 전용(카메라 아이콘 등)은 별도 플래그로 필터링
+				if (PrimitiveComponent->IsA(UBillboardComponent::StaticClass()))
+				{
+					const UBillboardComponent* BB = static_cast<const UBillboardComponent*>(PrimitiveComponent);
+					if (BB->IsEditorOnly())
+					{
+						if (!ShowFlags.HasFlag(EEngineShowFlags::SF_EditorActorVisualization)) continue;
+					}
+					else
+					{
+						if (!ShowFlags.HasFlag(EEngineShowFlags::SF_Billboard)) continue;
+					}
+				}
+				else
+				{
+					if (!ShowFlags.HasFlag(EEngineShowFlags::SF_Primitives)) continue;
+				}
 				if (!PrimitiveComponent->GetRenderMesh()) continue;
 			}
 

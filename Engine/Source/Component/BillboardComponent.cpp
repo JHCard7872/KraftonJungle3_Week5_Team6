@@ -43,6 +43,15 @@ void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InT
 	}
 }
 
+void UBillboardComponent::ResetMaterial(const FString& MaterialName)
+{
+	auto Base = FMaterialManager::Get().FindByName(MaterialName);
+	if (Base)
+	{
+		MaterialInstance = Base->CreateDynamicMaterial();
+	}
+}
+
 void UBillboardComponent::CopyPropertiesFrom(const UObject* Source)
 {
 	UPrimitiveComponent::CopyPropertiesFrom(Source);
@@ -51,6 +60,7 @@ void UBillboardComponent::CopyPropertiesFrom(const UObject* Source)
 	this->Size = SourceComp->Size;
 	this->Color = SourceComp->Color;
 	this->bBillboard = SourceComp->bBillboard;
+	this->bEditorOnly = SourceComp->bEditorOnly;
 
 	this->BillboardMesh = SourceComp->BillboardMesh;
 	this->MaterialInstance = SourceComp->MaterialInstance;

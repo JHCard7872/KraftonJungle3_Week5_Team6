@@ -323,6 +323,61 @@ bool FRenderer::Initialize(HWND InHwnd, int32 Width, int32 Height)
 		FMaterialManager::Get().Register("M_Default_Texture", DefaultTextureMaterial);
 	}
 
+	/** Billboard Icon Material - SubUV 쉐이더 + 알파 블렌딩으로 투명 PNG 지원 */
+	{
+		std::wstring SubUVVSPath = ShaderDirW + L"SubUVVertexShader.hlsl";
+		std::wstring SubUVPSPath = ShaderDirW + L"SubUVPixelShader.hlsl";
+		auto VS = FShaderMap::Get().GetOrCreateVertexShader(Device, SubUVVSPath.c_str());
+		auto PS = FShaderMap::Get().GetOrCreatePixelShader(Device, SubUVPSPath.c_str());
+
+		auto BillboardIconMaterial = std::make_shared<FMaterial>();
+		BillboardIconMaterial->SetOriginName("M_BillboardIcon");
+		BillboardIconMaterial->SetVertexShader(VS);
+		BillboardIconMaterial->SetPixelShader(PS);
+
+		// 양면 렌더링 (빌보드는 항상 카메라를 향하므로 컬링 불필요)
+		FRasterizerStateOption rasterizerOption;
+		rasterizerOption.FillMode = D3D11_FILL_SOLID;
+		rasterizerOption.CullMode = D3D11_CULL_NONE;
+		auto RS = RenderStateManager->GetOrCreateRasterizerState(rasterizerOption);
+		BillboardIconMaterial->SetRasterizerOption(rasterizerOption);
+		BillboardIconMaterial->SetRasterizerState(RS);
+
+		FDepthStencilStateOption depthOption;
+		depthOption.DepthEnable = true;
+		depthOption.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		auto DSS = RenderStateManager->GetOrCreateDepthStencilState(depthOption);
+		BillboardIconMaterial->SetDepthStencilOption(depthOption);
+		BillboardIconMaterial->SetDepthStencilState(DSS);
+
+		// 알파 블렌딩 - 투명 PNG 배경 제거
+		FBlendStateOption blendOption;
+		blendOption.BlendEnable = true;
+		blendOption.SrcBlend = D3D11_BLEND_SRC_ALPHA;
+		blendOption.DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+		blendOption.BlendOp = D3D11_BLEND_OP_ADD;
+		blendOption.SrcBlendAlpha = D3D11_BLEND_ONE;
+		blendOption.DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+		blendOption.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		auto BS = RenderStateManager->GetOrCreateBlendState(blendOption);
+		BillboardIconMaterial->SetBlendOption(blendOption);
+		BillboardIconMaterial->SetBlendState(BS);
+
+		// b2: SubUV 파라미터 - 텍스처 전체를 1셀로 (CellSize=1,1 / Offset=0,0)
+		int32 SlotIndex = BillboardIconMaterial->CreateConstantBuffer(Device, 16);
+		if (SlotIndex >= 0)
+		{
+			BillboardIconMaterial->RegisterParameter("CellSize", SlotIndex, 0, 8);
+			BillboardIconMaterial->RegisterParameter("UVOffset", SlotIndex, 8, 8);
+			float CellSize[2] = { 1.0f, 1.0f };
+			float UVOffset[2] = { 0.0f, 0.0f };
+			BillboardIconMaterial->GetConstantBuffer(SlotIndex)->SetData(CellSize, sizeof(CellSize), 0);
+			BillboardIconMaterial->GetConstantBuffer(SlotIndex)->SetData(UVOffset, sizeof(UVOffset), 8);
+		}
+
+		FMaterialManager::Get().Register("M_BillboardIcon", BillboardIconMaterial);
+	}
+
 	if (!TextRenderer.Initialize(this)) return false;
 
 	std::filesystem::path SubUVTexturePath = FPaths::ContentDir() / FString("Textures/SubUVDino.png");
