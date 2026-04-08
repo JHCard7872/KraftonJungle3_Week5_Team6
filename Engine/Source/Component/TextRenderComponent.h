@@ -7,6 +7,7 @@ class ENGINE_API UTextRenderComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(UTextRenderComponent, UPrimitiveComponent)
+	GENERATE_SHALLOW_CLONE(UTextRenderComponent)
 
 	void PostConstruct() override;
 
@@ -41,8 +42,7 @@ public:
 
 	void Serialize(FArchive& Ar) override;
 
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
+	virtual void FixupReferences(const FDuplicateionContext& Context) override;
 
 protected:
 	FString Text = "Text";

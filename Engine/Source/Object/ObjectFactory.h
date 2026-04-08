@@ -38,6 +38,8 @@ public:
 		return static_cast<T*>(ConstructObject(T::StaticClass(), InOuter, InName, InFlags));
 	}
 
+	static void RegisterClonedObject(UObject* NewObj);
+
 	static uint32 GetLastUUID();
 	static void SetLastUUID(uint32 InUUID);
 

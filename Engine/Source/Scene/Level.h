@@ -18,6 +18,7 @@ class ENGINE_API ULevel : public UObject
 {
 public:
 	DECLARE_RTTI(ULevel, UObject)
+	GENERATE_SHALLOW_CLONE(ULevel);
 	~ULevel();
 
 	/** 지정한 액터 타입을 생성하고 씬에 등록한 뒤 PostSpawnInitialize까지 호출한다. */
@@ -64,7 +65,6 @@ public:
 
 
 protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 	void DuplicateSubObjects(FDuplicateionContext& Context) override;
 
 private:

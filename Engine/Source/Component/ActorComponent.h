@@ -8,6 +8,7 @@ class ENGINE_API UActorComponent : public UObject
 {
 public:
 	DECLARE_RTTI(UActorComponent, UObject)
+	GENERATE_SHALLOW_CLONE(UActorComponent);
 
 	~UActorComponent() override = default;
 
@@ -26,9 +27,6 @@ public:
 	virtual void Serialize(FArchive& Ar);
 
 	void FixupReferences(const FDuplicateionContext& Context) override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 protected:
 	TObjectPtr<AActor> Owner;

@@ -23,6 +23,7 @@ class ENGINE_API UPrimitiveComponent : public USceneComponent
 {
 public:
 	DECLARE_RTTI(UPrimitiveComponent, USceneComponent)
+	GENERATE_SHALLOW_CLONE(UPrimitiveComponent);
 
 	// virtual FBoxSphereBounds GetWorldBounds() const { return Bounds; };
 	virtual FBoxSphereBounds GetWorldBounds() const { return CalcBounds(GetWorldTransform()); }
@@ -34,9 +35,6 @@ public:
 	void SetDrawDebugBounds(bool bEnable) { bDrawDebugBounds = bEnable; }
 
 	virtual FRenderMesh* GetRenderMesh() const { return nullptr; }
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 protected:
 	FBoxSphereBounds Bounds;

@@ -162,6 +162,9 @@ void FEditorEngine::EndPIE()
 
 	UE_LOG("[PIE] Play In Editor Stopped.");
 
+	GetActiveWorld()->SetPaused(false);
+
+	// 마우스 캡처 해제
 	if (FInputManager* Input = GetInputManager())
 	{
 		Input->SetMouseCapture(false);
@@ -537,6 +540,12 @@ void FEditorEngine::RenderFrame()
 					Renderer->GetDeviceContext()->RSSetViewports(1, &VP);
 					PIEViewportClient->Render(this, Renderer);
 				}
+
+				// D3D11 뷰포트를 패널 rect로 제한한 뒤 게임 씬을 렌더한다.
+				Renderer->SetRenderViewport(static_cast<float>(Rect.X), static_cast<float>(Rect.Y),
+					static_cast<float>(Rect.Width), static_cast<float>(Rect.Height), 0.0f, 1.0f);
+
+				PIEViewportClient->Render(this, Renderer);
 			}
 			Renderer->EndFrame();
 			return;

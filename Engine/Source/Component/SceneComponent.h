@@ -6,6 +6,7 @@ class ENGINE_API USceneComponent : public UActorComponent
 {
 public:
 	DECLARE_RTTI(USceneComponent, UActorComponent)
+	GENERATE_SHALLOW_CLONE(USceneComponent);
 
 	/** 부모 기준 상대 트랜스폼 전체를 반환한다. */
 	const FTransform& GetRelativeTransform() const { return RelativeTransform; }
@@ -33,8 +34,6 @@ public:
 
 	/** 상대 위치/회전/스케일을 직렬화해 씬 저장 데이터와 연결한다. */
 	void Serialize(FArchive& Ar) override;
-
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 protected:
 	void FixupReferences(const FDuplicateionContext& Context) override;

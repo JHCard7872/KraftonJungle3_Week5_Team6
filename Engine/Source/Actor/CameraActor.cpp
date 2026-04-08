@@ -24,11 +24,3 @@ void ACameraActor::FixupReferences(const FDuplicateionContext& Context)
 		this->CameraComponent = static_cast<UCameraComponent*>(Context.GetMappedObject(this->CameraComponent));
 	}
 }
-void ACameraActor::CopyPropertiesFrom(const UObject* Source)
-{
-	AActor::CopyPropertiesFrom(Source);
-	const ACameraActor* SourceActor = static_cast<const ACameraActor*> (Source);
-
-	// 얕은 복사 -> FixupReferences에서 PIE 월드 내 복사본으로 교정됨.
-	this->CameraComponent = SourceActor->CameraComponent;
-}
