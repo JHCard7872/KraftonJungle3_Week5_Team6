@@ -6,8 +6,9 @@ SamplerState Sampler : register(s0);
 // Material 상수 버퍼 (b2)
 cbuffer MaterialData : register(b2)
 {
-	// TODO: 틴트 적용 추가하기
-	float4 BaseColor;
+	float4 ColorTint;
+	float2 UVScrollSpeed;
+	float2 Padding;
 };
 
 float4 main(VS_OUTPUT Input) : SV_TARGET
