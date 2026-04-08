@@ -391,29 +391,25 @@ void FEditorEngine::FinalizeInitialize()
 
 void FEditorEngine::PrepareFrame(float DeltaTime)
 {
-	FInputManager* Input = GetInputManager();
-	if (!Input) return;
-
 	if (IsPlayingInEditor())
 	{
-		if (Input->IsKeyDown(VK_ESCAPE))
+		if (::GetAsyncKeyState(VK_ESCAPE) & 0x8000)
 		{
 			EndPIE();
-			return;
 		}
-		if (Input->IsKeyPressed(VK_F8))
+
+		// F8: Possess/Eject 토글
+		static bool bF8WasDown = false;
+		bool bF8IsDown = (::GetAsyncKeyState(VK_F8) & 0x8000) != 0;
+		if (bF8IsDown && !bF8WasDown)
 		{
-			Input->SetMouseCapture(!Input->IsMouseCaptured());
-			UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
-		}
-		if (Input->IsKeyPressed('P'))
-		{
-			if (UWorld* ActiveWorld = GetActiveWorld())
+			if (FInputManager* Input = GetInputManager())
 			{
-				ActiveWorld->SetPaused(!ActiveWorld->IsPaused());
-				UE_LOG("[PIE] %s", ActiveWorld->IsPaused() ? "Paused" : "Resumed");
+				Input->SetMouseCapture(!Input->IsMouseCaptured());
+				UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
 			}
 		}
+		bF8WasDown = bF8IsDown;
 	}
 
 	SyncViewportClient();
@@ -422,10 +418,16 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 
 	if (IsPlayingInEditor())
 	{
-		if (UWorld* ActiveWorld = GetActiveWorld(); ActiveWorld && !ActiveWorld->IsPaused())
+		// ESC로 PIE 종료
+		FInputManager* Input = GetInputManager();
+		if (Input && Input->IsKeyDown(VK_ESCAPE))
 		{
-			TickPIECamera(DeltaTime);
+			EndPIE();
+			return;
 		}
+
+		// PIE 중 우클릭 + WASD/마우스로 카메라 이동
+		TickPIECamera(DeltaTime);
 	}
 }
 
