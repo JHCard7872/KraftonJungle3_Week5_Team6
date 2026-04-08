@@ -135,7 +135,6 @@ public:
 	virtual UObject* Clone() const { return new UObject(*this); }
 
 protected:
-	virtual void CopyPropertiesFrom(const UObject* Source);
 	virtual void DuplicateSubObjects(FDuplicateionContext& Context);
 
 private:

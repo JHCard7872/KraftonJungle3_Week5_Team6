@@ -7,6 +7,7 @@ class ENGINE_API UUUIDBillboardComponent : public UTextRenderComponent
 {
 public:
 	DECLARE_RTTI(UUUIDBillboardComponent, UTextRenderComponent)
+	GENERATE_SHALLOW_CLONE(UUUIDBillboardComponent);
 
 	void PostConstruct() override;
 
@@ -20,8 +21,7 @@ public:
 
 	virtual FBoxSphereBounds GetWorldBounds() const override;
 
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
+	void FixupReferences(const FDuplicateionContext& Context) override;
 
 private:
 	FVector WorldOffset = FVector(0.0f, 0.0f, 0.3f);

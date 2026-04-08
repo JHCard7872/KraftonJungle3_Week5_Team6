@@ -8,12 +8,10 @@ class ENGINE_API ACubeActor : public AActor
 {
 public:
 	DECLARE_RTTI(ACubeActor, AActor)
+	GENERATE_SHALLOW_CLONE(ACubeActor);
 
 	void PostSpawnInitialize() override;
 	void FixupReferences(const FDuplicateionContext& Context) override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	UStaticMeshComponent*CubeMeshComponent = nullptr;

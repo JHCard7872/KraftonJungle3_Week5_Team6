@@ -9,13 +9,11 @@ class ENGINE_API AStaticMeshActor : public AActor
 {
 public:
 	DECLARE_RTTI(AStaticMeshActor, AActor)
+	GENERATE_SHALLOW_CLONE(AStaticMeshActor);
 
 	virtual void PostSpawnInitialize() override;
 
 	void FixupReferences(const FDuplicateionContext& Context) override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	UStaticMeshComponent* StaticMeshComp = nullptr;

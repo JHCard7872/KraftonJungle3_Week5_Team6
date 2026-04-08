@@ -8,12 +8,10 @@ class ENGINE_API APlaneActor : public AActor
 {
 public:
 	DECLARE_RTTI(APlaneActor, AActor)
+	GENERATE_SHALLOW_CLONE(APlaneActor);
 
 	void PostSpawnInitialize() override;
-	void FixupReferences(const FDuplicateionContext& Context);
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source);
+	void FixupReferences(const FDuplicateionContext& Context) override;
 
 private:
 	UStaticMeshComponent* PlaneMeshComponent = nullptr;

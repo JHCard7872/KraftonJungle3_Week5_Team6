@@ -182,12 +182,6 @@ void UObject::FixupReferences(const FDuplicateionContext& Context)
 {
 }
 
-void UObject::CopyPropertiesFrom(const UObject* Source)
-{
-	if (!Source) return;
-	this->Flags = Source->Flags;
-}
-
 void UObject::DuplicateSubObjects(FDuplicateionContext& Context)
 {
 }

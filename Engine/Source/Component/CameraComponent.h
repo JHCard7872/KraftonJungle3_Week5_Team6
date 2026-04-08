@@ -7,6 +7,8 @@ class ENGINE_API UCameraComponent : public USceneComponent
 {
 public:
 	DECLARE_RTTI(UCameraComponent, USceneComponent)
+	GENERATE_SHALLOW_CLONE(UCameraComponent);
+	UCameraComponent(const UCameraComponent& Other);
 	virtual ~UCameraComponent();
 
 	void PostConstruct() override;
@@ -26,9 +28,6 @@ public:
 	void SetFov(float inFov);
 	void SetSpeed(float Inspeed);
 	void SetSensitivity(float InSetSensitivity);
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	FCamera* Camera = nullptr;

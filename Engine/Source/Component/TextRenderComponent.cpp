@@ -55,26 +55,21 @@ void UTextRenderComponent::Serialize(FArchive& Ar)
 	}
 }
 
-void UTextRenderComponent::CopyPropertiesFrom(const UObject* Source)
+void UTextRenderComponent::FixupReferences(const FDuplicateionContext& Context)
 {
-	UPrimitiveComponent::CopyPropertiesFrom(Source);
-	const UTextRenderComponent* SourceComp = static_cast<const UTextRenderComponent*>(Source);
+	UPrimitiveComponent::FixupReferences(Context);
+	UPrimitiveComponent::FixupReferences(Context);
 
-	this->Text = SourceComp->Text;
-	this->TextColor = SourceComp->TextColor;
-	this->TextScale = SourceComp->TextScale;
-	this->bBillboard = SourceComp->bBillboard;
-
-	// ⭐ TextMesh를 복제 시점에 공유하지 않고 새로 생성하게 함 (PIE와 에디터 렌더링 독립성 보장)
+	// 2. 포인터 공유 방지 (PIE 복제본에게만 새 도화지 발급)
 	this->TextMesh = std::make_shared<FDynamicMesh>();
 	if (this->TextMesh)
 	{
 		this->TextMesh->Topology = EMeshTopology::EMT_TriangleList;
 		this->TextMesh->bIsDirty = true;
 	}
-
 	this->bTextMeshDirty = true;
 }
+
 
 FBoxSphereBounds UTextRenderComponent::GetWorldBounds() const
 {

@@ -116,24 +116,6 @@ void UWorld::FixupReferences(const FDuplicateionContext& Context)
 	}
 }
 
-void UWorld::CopyPropertiesFrom(const UObject* Source)
-{
-	UObject::CopyPropertiesFrom(Source);
-	const UWorld* SourceWorld = static_cast<const UWorld*>(Source);
-
-	// 단순 변수 얕은 복사
-	this->WorldTime = SourceWorld->WorldTime;
-	this->DeltaSeconds = SourceWorld->DeltaSeconds;
-	this->WorldType = SourceWorld->WorldType;
-	this->bBegunPlay = SourceWorld->bBegunPlay;
-
-	// 포인터/배열들 우선 얕은 복사 -> DuplicateSubObjects와 Fixup에서 수리 예정.
-	this->PersistentLevel = SourceWorld->PersistentLevel;
-	this->StreamingLevels = SourceWorld->StreamingLevels;
-	this->LevelCameraComponent = SourceWorld->LevelCameraComponent;
-	this->ActiveCameraComponent = SourceWorld->ActiveCameraComponent;
-}
-
 void UWorld::DuplicateSubObjects(FDuplicateionContext& Context)
 {
 	UObject::DuplicateSubObjects(Context);

@@ -21,11 +21,3 @@ void AStaticMeshActor::FixupReferences(const FDuplicateionContext& Context)
 		this->StaticMeshComp = static_cast<UStaticMeshComponent*>(Context.GetMappedObject(this->StaticMeshComp));
 	}
 }
-
-void AStaticMeshActor::CopyPropertiesFrom(const UObject* Source)
-{
-	AActor::CopyPropertiesFrom(Source);
-	const AStaticMeshActor* SourceActor = static_cast<const AStaticMeshActor*>(Source);
-
-	this->StaticMeshComp = SourceActor->StaticMeshComp;
-}

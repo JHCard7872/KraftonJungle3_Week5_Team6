@@ -13,10 +13,13 @@ class FSlateApplication
 	FViewportId HoveredViewportId = INVALID_VIEWPORT_ID;
 	FViewportId FocusedViewportId = INVALID_VIEWPORT_ID;
 	FViewportId MouseCapturedViewportId = INVALID_VIEWPORT_ID;
-	SSplitter*  DraggingSplitter = nullptr;
-	bool bViewportMaximized = false;
-	EViewportLayout LayoutBeforeMaximize = EViewportLayout::FourGrid;
 	FViewportId MaximizedViewportId = INVALID_VIEWPORT_ID;
+	EViewportLayout LayoutBeforeMaximize = EViewportLayout::FourGrid;
+
+	SSplitter*  DraggingSplitter = nullptr;
+
+	bool bViewportMaximized = false;
+
 	int32 SwappedViewportIndex = -1;
 	float SavedSplitterRatios[3] = { 0.5f, 0.5f, 0.5f };
 
