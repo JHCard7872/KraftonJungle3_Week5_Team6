@@ -1,8 +1,9 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Math/Vector.h"
+#include "Math/Vector2.h"
 
-//Json을 담아두는곳
+//Jsonì„ ë‹´ì•„ë‘ëŠ”ê³³
 class ENGINE_API FArchive
 {
 public:
@@ -10,21 +11,22 @@ public:
 	~FArchive();
 	bool IsSaving() const { return bSaving; }
 	bool IsLoading() const { return !bSaving; }
-	// 기본 타입 직렬화
+	// ê¸°ë³¸ íƒ€ìž… ì§ë ¬í™”
 	void Serialize(const FString& Key, FString& Value);
 	void Serialize(const FString& Key, uint32& Value);
 	void Serialize(const FString& Key, bool& Value);
+	void Serialize(const FString& Key, FVector2& Value);
 	void Serialize(const FString& Key, FVector& Value);
 	void Serialize(const FString& Key, FVector4& Value);
-	// 배열
+	// ë°°ì—´
 	void Serialize(const FString& Key, TArray<FArchive*>& SubArchives);
 	void SerializeUIntArray(const FString& Key, TArray<uint32>& Values);
 	void SerializeStringArray(const FString& Key, TArray<FString>& Values);
 
-	// 키 존재 여부
+	// í‚¤ ì¡´ìž¬ ì—¬ë¶€
 	bool Contains(const FString& Key) const;
 	void* GetRawJson();
 private:
 	bool bSaving;
-	void* JsonData;// nlohmann::json* — 헤더에 json 노출 안 함
+	void* JsonData;// nlohmann::json* â€” í—¤ë”ì— json ë…¸ì¶œ ì•ˆ í•¨
 };

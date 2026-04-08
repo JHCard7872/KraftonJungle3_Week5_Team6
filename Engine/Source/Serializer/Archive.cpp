@@ -39,6 +39,17 @@ void FArchive::Serialize(const FString& Key, bool& Value)
 	else if (Json.contains(Key))
 		Value = Json[Key].get<bool>();
 }
+void FArchive::Serialize(const FString& Key, FVector2& Value)
+{
+	json& Json = *static_cast<json*>(JsonData);
+	if (bSaving)
+		Json[Key] = { Value.X, Value.Y };
+	else if (Json.contains(Key))
+	{
+		auto& xy = Json[Key];
+		Value = { xy[0].get<float>(), xy[1].get<float>() };
+	}
+}
 void FArchive::Serialize(const FString& Key, FVector& Value)
 {
 	json& Json = *static_cast<json*>(JsonData);
