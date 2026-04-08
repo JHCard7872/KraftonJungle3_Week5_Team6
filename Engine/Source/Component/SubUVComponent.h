@@ -7,6 +7,7 @@ class ENGINE_API USubUVComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(USubUVComponent, UPrimitiveComponent)
+	GENERATE_SHALLOW_CLONE(USubUVComponent);
 
 	void PostConstruct() override;
 
@@ -42,9 +43,6 @@ public:
 	/** SubUV 렌더링용 메시 데이터 반환 */
 	virtual FRenderMesh* GetRenderMesh() const override;
 	FDynamicMesh* GetSubUVMesh() const { return SubUVMesh.get(); }
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	FVector2 Size = FVector2(1.f, 1.f);

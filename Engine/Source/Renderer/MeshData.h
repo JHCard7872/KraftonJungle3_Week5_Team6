@@ -25,6 +25,7 @@ class ENGINE_API UStaticMesh : public UObject
 {
 public:
 	DECLARE_RTTI(UStaticMesh, UObject)
+	GENERATE_SHALLOW_CLONE(UStaticMesh);
 	virtual ~UStaticMesh() = default;
 
 	FBoxSphereBounds LocalBounds;
@@ -36,9 +37,6 @@ public:
 
 	const TArray<std::shared_ptr<FMaterial>>& GetDefaultMaterials() const { return DefaultMaterials; }
 	void AddDefaultMaterial(const std::shared_ptr<FMaterial>& InMaterial) { DefaultMaterials.push_back(InMaterial); }
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	std::shared_ptr<FStaticMesh> StaticMeshAsset;

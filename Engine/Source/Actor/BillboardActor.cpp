@@ -20,11 +20,3 @@ void ABillboardActor::FixupReferences(const FDuplicateionContext& Context)
 		this->BillboardComp = static_cast<UBillboardComponent*>(Context.GetMappedObject(this->BillboardComp));
 	}
 }
-
-void ABillboardActor::CopyPropertiesFrom(const UObject* Source)
-{
-	AActor::CopyPropertiesFrom(Source);
-	const ABillboardActor* SourceActor = static_cast<const ABillboardActor*>(Source);
-
-	this->BillboardComp = SourceActor->BillboardComp;
-}

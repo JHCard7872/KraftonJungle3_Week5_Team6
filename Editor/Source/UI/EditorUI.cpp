@@ -30,6 +30,7 @@
 #include "Component/SubUVComponent.h"
 #include "Component/UUIDBillboardComponent.h"
 #include "Component/BillboardComponent.h"
+#include "Input/InputManager.h"
 
 enum class EFileDialogType
 {
@@ -890,21 +891,23 @@ void FEditorUI::Render()
 			ImGui::EndMenu();
 		}
 
-		// PIE Play/Stop Button
+		// PIE Play/Stop/Pause Buttons
 		if (Engine)
 		{
 			bool bIsPlaying = Engine->IsPlayingInEditor();
-			const char* ButtonLabel = bIsPlaying ? "Stop" : "Play";
-			ImVec4 ButtonColor = bIsPlaying ? ImVec4(0.8f, 0.2f, 0.2f, 1.0f) : ImVec4(0.2f, 0.7f, 0.2f, 1.0f);
-			ImVec4 ButtonHoverColor = bIsPlaying ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) : ImVec4(0.3f, 0.9f, 0.3f, 1.0f);
+			const char* PlayStopLabel = bIsPlaying ? "Stop" : "Play";
+			ImVec4 PlayStopColor = bIsPlaying ? ImVec4(0.8f, 0.2f, 0.2f, 1.0f) : ImVec4(0.2f, 0.7f, 0.2f, 1.0f);
+			ImVec4 PlayStopHoverColor = bIsPlaying ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) : ImVec4(0.3f, 0.9f, 0.3f, 1.0f);
 
 			float MenuBarWidth = ImGui::GetWindowWidth();
 			float ButtonWidth = 60.0f;
-			ImGui::SetCursorPosX((MenuBarWidth - ButtonWidth) * 0.5f);
+			float TotalButtonsWidth = bIsPlaying ? (ButtonWidth * 2 + 10.0f) : ButtonWidth;
+			ImGui::SetCursorPosX((MenuBarWidth - TotalButtonsWidth) * 0.5f);
 
-			ImGui::PushStyleColor(ImGuiCol_Button, ButtonColor);
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ButtonHoverColor);
-			if (ImGui::Button(ButtonLabel, ImVec2(ButtonWidth, 0)))
+			// Play / Stop Button
+			ImGui::PushStyleColor(ImGuiCol_Button, PlayStopColor);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, PlayStopHoverColor);
+			if (ImGui::Button(PlayStopLabel, ImVec2(ButtonWidth, 0)))
 			{
 				if (bIsPlaying)
 				{
@@ -916,6 +919,34 @@ void FEditorUI::Render()
 				}
 			}
 			ImGui::PopStyleColor(2);
+
+			// Pause / Resume Button (Only visible during PIE)
+			if (bIsPlaying)
+			{
+				ImGui::SameLine(0, 10.0f);
+				UWorld* ActiveWorld = Engine->GetActiveWorld();
+				bool bIsPaused = ActiveWorld ? ActiveWorld->IsPaused() : false;
+
+				const char* PauseLabel = bIsPaused ? "Resume" : "Pause";
+				ImVec4 PauseColor = bIsPaused ? ImVec4(0.2f, 0.6f, 0.8f, 1.0f) : ImVec4(0.8f, 0.6f, 0.2f, 1.0f);
+				
+				ImGui::PushStyleColor(ImGuiCol_Button, PauseColor);
+				if (ImGui::Button(PauseLabel, ImVec2(ButtonWidth, 0)))
+				{
+					if (ActiveWorld)
+					{
+						ActiveWorld->SetPaused(!bIsPaused);
+						if (bIsPaused)
+						{
+							if (auto* Input = Engine->GetInputManager())
+							{
+								Input->SetMouseCapture(!Input->IsMouseCaptured());
+							}
+						}
+					}
+				}
+				ImGui::PopStyleColor(1);
+			}
 		}
 
 		ImGui::EndMainMenuBar();

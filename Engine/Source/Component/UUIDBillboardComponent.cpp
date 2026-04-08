@@ -18,6 +18,11 @@ FString UUUIDBillboardComponent::GetDisplayText() const
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor)
 	{
+		OwnerActor = dynamic_cast<AActor*>(GetOuter());
+	}
+
+	if (!OwnerActor)
+	{
 		return "";
 	}
 
@@ -27,6 +32,20 @@ FString UUUIDBillboardComponent::GetDisplayText() const
 FVector UUUIDBillboardComponent::GetRenderWorldPosition() const
 {
 	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		// Owner 포인터가 아직 Fixup되지 않았을 경우를 대비해 Outer를 체크함 (Duplicate 시 Outer는 새 액터로 설정됨)
+		OwnerActor = dynamic_cast<AActor*>(GetOuter());
+	}
+
+	// UUID가 변경되었는지 실시간으로 체크 (렌더링 직전에 호출됨)
+	if (OwnerActor && OwnerActor->UUID != LastDisplayUUID)
+	{
+		UUUIDBillboardComponent* MutableThis = const_cast<UUUIDBillboardComponent*>(this);
+		MutableThis->LastDisplayUUID = OwnerActor->UUID;
+		MutableThis->MarkTextMeshDirty();
+	}
+
 	if (!OwnerActor) return WorldOffset;
 
 	USceneComponent* Root = OwnerActor->GetRootComponent();
@@ -84,11 +103,10 @@ FBoxSphereBounds UUUIDBillboardComponent::GetWorldBounds() const
 	return { Center, Extent.Size(), Extent };
 }
 
-void UUUIDBillboardComponent::CopyPropertiesFrom(const UObject* Source)
+void UUUIDBillboardComponent::FixupReferences(const FDuplicateionContext& Context)
 {
-	UTextRenderComponent::CopyPropertiesFrom(Source);
+	UTextRenderComponent::FixupReferences(Context);
 
-	const UUUIDBillboardComponent* SourceComp = static_cast<const UUUIDBillboardComponent*>(Source);
-
-	this->WorldOffset = SourceComp->WorldOffset;
+	// 복제 후 새로운 Owner의 UUID를 즉시 반영하기 위해 Dirty 마킹
+	MarkTextMeshDirty();
 }

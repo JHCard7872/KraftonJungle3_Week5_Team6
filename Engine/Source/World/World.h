@@ -16,6 +16,7 @@ class ENGINE_API UWorld : public UObject
 {
 public:
 	DECLARE_RTTI(UWorld, UObject)
+	GENERATE_SHALLOW_CLONE(UWorld);
 	~UWorld() override;
 
 	/** PersistentLevel에 새 액터를 스폰하고, 생성 직후 초기화까지 마친 뒤 반환한다. */
@@ -65,8 +66,13 @@ public:
 
 	void FixupReferences(const FDuplicateionContext& Context) override;
 
+	bool IsPaused() const { return bIsPaused; }
+	void SetPaused(bool bInPaused) { bIsPaused = bInPaused; }
+
+	float GetTimeScale() const { return TimeScale; }
+	void SetTimeScale(float InTimeScale) { TimeScale = InTimeScale; }
+
 protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 	void DuplicateSubObjects(FDuplicateionContext& Context) override;
 
 private:
@@ -77,6 +83,10 @@ private:
 	float WorldTime = 0.f;
 	float DeltaSeconds = 0.f;
 	EWorldType WorldType = EWorldType::Game;
+
+	bool bIsPaused = false;
+	float TimeScale = 1.0f;
+
 	UCameraComponent* LevelCameraComponent = nullptr;
 	TObjectPtr<UCameraComponent> ActiveCameraComponent;
 };

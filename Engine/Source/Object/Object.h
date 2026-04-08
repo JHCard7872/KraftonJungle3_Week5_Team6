@@ -32,6 +32,11 @@
         return &ClassInfo; \
     }
 
+#define GENERATE_SHALLOW_CLONE(ClassName) \
+	virtual UObject* Clone() const override \
+	{										\
+		return new ClassName(*this);\
+	}
 class UClass;
 class UObject;
 
@@ -127,8 +132,9 @@ public:
 	virtual UObject* Duplicate(FDuplicateionContext& Context, UObject* NewOuter = nullptr);
 	virtual void FixupReferences(const FDuplicateionContext& Context);
 
+	virtual UObject* Clone() const { return new UObject(*this); }
+
 protected:
-	virtual void CopyPropertiesFrom(const UObject* Source);
 	virtual void DuplicateSubObjects(FDuplicateionContext& Context);
 
 private:

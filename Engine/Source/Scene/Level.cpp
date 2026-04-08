@@ -149,15 +149,6 @@ void ULevel::Tick(float DeltaTime)
 	CleanupDestroyedActors();
 }
 
-void ULevel::CopyPropertiesFrom(const UObject* Source)
-{
-	UObject::CopyPropertiesFrom(Source);
-	const ULevel* SourceLevel = static_cast<const ULevel*>(Source);
-
-	this->Actors = SourceLevel->Actors;
-	this->bBegunPlay = SourceLevel->bBegunPlay;
-}
-
 void ULevel::DuplicateSubObjects(FDuplicateionContext& Context)
 {
 	UObject::DuplicateSubObjects(Context);
