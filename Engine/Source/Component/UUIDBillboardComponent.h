@@ -25,4 +25,5 @@ protected:
 
 private:
 	FVector WorldOffset = FVector(0.0f, 0.0f, 0.3f);
+	uint32 LastDisplayUUID = 0;
 };

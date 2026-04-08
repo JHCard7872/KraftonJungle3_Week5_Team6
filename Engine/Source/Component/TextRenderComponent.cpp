@@ -65,9 +65,15 @@ void UTextRenderComponent::CopyPropertiesFrom(const UObject* Source)
 	this->TextScale = SourceComp->TextScale;
 	this->bBillboard = SourceComp->bBillboard;
 
-	this->TextMesh = SourceComp->TextMesh;
+	// ⭐ TextMesh를 복제 시점에 공유하지 않고 새로 생성하게 함 (PIE와 에디터 렌더링 독립성 보장)
+	this->TextMesh = std::make_shared<FDynamicMesh>();
+	if (this->TextMesh)
+	{
+		this->TextMesh->Topology = EMeshTopology::EMT_TriangleList;
+		this->TextMesh->bIsDirty = true;
+	}
 
-	this->bTextMeshDirty = SourceComp->bTextMeshDirty;
+	this->bTextMeshDirty = true;
 }
 
 FBoxSphereBounds UTextRenderComponent::GetWorldBounds() const

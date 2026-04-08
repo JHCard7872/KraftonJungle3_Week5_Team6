@@ -27,6 +27,15 @@ FString UUUIDBillboardComponent::GetDisplayText() const
 FVector UUUIDBillboardComponent::GetRenderWorldPosition() const
 {
 	AActor* OwnerActor = GetOwner();
+
+	// UUID가 변경되었는지 실시간으로 체크 (렌더링 직전에 호출됨)
+	if (OwnerActor && OwnerActor->UUID != LastDisplayUUID)
+	{
+		UUUIDBillboardComponent* MutableThis = const_cast<UUUIDBillboardComponent*>(this);
+		MutableThis->LastDisplayUUID = OwnerActor->UUID;
+		MutableThis->MarkTextMeshDirty();
+	}
+
 	if (!OwnerActor) return WorldOffset;
 
 	USceneComponent* Root = OwnerActor->GetRootComponent();
