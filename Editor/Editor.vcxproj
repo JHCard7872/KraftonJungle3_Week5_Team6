@@ -262,6 +262,12 @@
   <ItemGroup>
     <Natvis Include="ThirdParty\imgui\imgui.natvis" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Engine\Engine.vcxproj">
+      <Project>{135D1BDB-24F8-4FBC-959A-F422D47E0261}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>
