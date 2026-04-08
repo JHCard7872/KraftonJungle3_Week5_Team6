@@ -39,6 +39,12 @@ public:
 	const FWorldContext* GetActiveWorldContext() const override;
 	void HandleResize(int32 Width, int32 Height) override;
 
+	/** 현재 PIE가 활성화된 경우, PIE가 렌더링되고 입력을 받는 뷰포트의 ID를 반환한다. */
+	FViewportId GetPIEViewportId() const;
+
+	bool IsPIEJustCaptured() const { return bPIEJustCaptured; }
+	void SetPIEJustCaptured(bool bInJust) { bPIEJustCaptured = bInJust; }
+
 	const TArray<FViewport>& GetViewports() const { return ViewportRegistry.GetViewports(); }
 	TArray<FViewport>& GetViewports() { return ViewportRegistry.GetViewports(); }
 	const FEditorViewportRegistry& GetViewportRegistry() const { return ViewportRegistry; }
@@ -104,4 +110,5 @@ private:
 	FEditorViewportClient* EditorViewportClientRaw = nullptr;
 
 	std::unique_ptr<FSlateApplication> SlateApplication = nullptr;
+	bool bPIEJustCaptured = false;
 };

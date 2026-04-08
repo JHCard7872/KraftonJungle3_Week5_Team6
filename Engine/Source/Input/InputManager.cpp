@@ -117,6 +117,11 @@ void FInputManager::SetMouseCapture(bool bInCapture)
 	if (bIsMouseCaptured == bInCapture) return;
 
 	bIsMouseCaptured = bInCapture;
+	
+	// 캡처 상태가 바뀔 때 델타값 초기화 (카메라 튀는 현상 방지)
+	MouseDeltaX = 0.0f;
+	MouseDeltaY = 0.0f;
+
 	if (bIsMouseCaptured)
 	{
 		ShowCursor(FALSE);

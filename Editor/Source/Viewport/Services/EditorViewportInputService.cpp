@@ -178,33 +178,65 @@ void FEditorViewportInputService::HandleMessage(
 	const int32 MouseX = static_cast<int32>(static_cast<short>(LOWORD(LParam)));
 	const int32 MouseY = static_cast<int32>(static_cast<short>(HIWORD(LParam)));
 
+	const bool bIsPlaying = EditorEngine->IsPlayingInEditor();
+	FInputManager* Input = Engine->GetInputManager();
+	const bool bIsCaptured = Input && Input->IsMouseCaptured();
+	const FViewportId PIEViewportId = EditorEngine->GetPIEViewportId();
+
+	// [수정] 마우스가 캡처된 상태라면 슬레이트 및 에디터 모든 상호작용 차단 (포커스 변경 방지)
+	if (bIsPlaying && bIsCaptured)
+	{
+		if (Msg >= WM_MOUSEFIRST && Msg <= WM_MOUSELAST)
+		{
+			return;
+		}
+	}
+
 	switch (Msg)
 	{
 	case WM_LBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+	{
 		Slate->ProcessMouseDown(MouseX, MouseY);
 		// PIE 모드일 때 실제 뷰포트 영역(Slate Area) 내부를 클릭했을 때만 마우스 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
+		if (bIsPlaying && Slate->GetIsCoursorInArea())
 		{
-			if (FInputManager* Input = Engine->GetInputManager())
+			// 현재 어느 뷰포트가 PIE용인지 판별 (RenderAll의 로직과 동일)
+			FViewportId PIEViewportId = INVALID_VIEWPORT_ID;
+			FViewportId FocusedId = Slate->GetFocusedViewportId();
+			FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+			if (FocusedEntry && FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
 			{
-				Input->SetMouseCapture(true);
+				PIEViewportId = FocusedId;
+			}
+			else
+			{
+				FViewportEntry* PerspEntry = ViewportRegistry.FindEntryByType(EViewportType::Perspective);
+				if (PerspEntry) PIEViewportId = PerspEntry->Id;
+			}
+
+			// 클릭한 지점이 해당 PIE 뷰포트의 영역 내부인지 최종 확인
+			FViewport* PIEViewport = ViewportRegistry.GetViewportById(PIEViewportId);
+			if (PIEViewport)
+			{
+				const FRect& Rect = PIEViewport->GetRect();
+				if (MouseX >= Rect.X && MouseX < (Rect.X + Rect.Width) &&
+					MouseY >= Rect.Y && MouseY < (Rect.Y + Rect.Height))
+				{
+					if (Input)
+					{
+						Input->SetMouseCapture(true);
+						POINT Center = { Rect.X + Rect.Width / 2, Rect.Y + Rect.Height / 2 };
+						::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
+						::SetCursorPos(Center.x, Center.y);
+						UE_LOG("[PIE] Re-captured (Possessed)");
+					}
+				}
 			}
 		}
 		break;
+	}
 	case WM_LBUTTONDBLCLK:
-		Slate->ProcessMouseDoubleClick(MouseX, MouseY);
-		return;
-	case WM_RBUTTONDOWN:
-		Slate->ProcessMouseDown(MouseX, MouseY);
-		// 우클릭 시에도 동일하게 뷰포트 영역 내부인지 확인 후 캡처
-		if (EditorEngine->IsPlayingInEditor() && Slate->GetIsCoursorInArea())
-		{
-			if (FInputManager* Input = Engine->GetInputManager())
-			{
-				Input->SetMouseCapture(true);
-			}
-		}
-		break;
 	case WM_MOUSEMOVE:
 		Slate->ProcessMouseMove(MouseX, MouseY);
 		break;
@@ -239,16 +271,25 @@ void FEditorViewportInputService::HandleMessage(
 		return;
 	}
 
-	ULevel* Level = Engine->GetLevel();
-	AActor* SelectedActor = EditorEngine->GetSelectedActor();
-	if (!Level)
-	{
-		return;
-	}
+	const bool bRightMouseDown = Input && Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
 
-	const bool bRightMouseDown = Engine->GetInputManager() &&
-		Engine->GetInputManager()->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
-	FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(Slate->GetFocusedViewportId());
+	auto GetLevelForViewport = [&](FViewportId ViewportId) -> ULevel*
+	{
+		if (bIsPlaying)
+		{
+			if (ViewportId == EditorEngine->GetPIEViewportId())
+			{
+				return EditorEngine->GetActiveLevel();
+			}
+			else
+			{
+				return EditorEngine->GetEditorLevel();
+			}
+		}
+		return EditorEngine->GetActiveLevel();
+	};
+
+	AActor* SelectedActor = EditorEngine->GetSelectedActor();
 
 	switch (Msg)
 	{
@@ -287,12 +328,32 @@ void FEditorViewportInputService::HandleMessage(
 
 	case WM_LBUTTONDOWN:
 	{
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetFocusedViewportId());
+		FViewportId FocusedId = Slate->GetFocusedViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(FocusedId);
 		if (!Viewport)
 		{
 			return;
 		}
 
+		// [수정] Ejected 상태에서 PIE 뷰포트를 클릭하면 다시 캡처(Possess) 모드로 진입
+		if (bIsPlaying && !bIsCaptured && FocusedId == PIEViewportId)
+		{
+			EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지
+			Input->SetMouseCapture(true);
+			POINT Center = { Viewport->GetRect().X + Viewport->GetRect().Width / 2, Viewport->GetRect().Y + Viewport->GetRect().Height / 2 };
+			::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
+			::SetCursorPos(Center.x, Center.y);
+			UE_LOG("[PIE] Re-captured (Possessed)");
+			return;
+		}
+
+		ULevel* Level = GetLevelForViewport(FocusedId);
+		if (!Level)
+		{
+			return;
+		}
+
+		FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(FocusedId);
 		const FRect& Rect = Viewport->GetRect();
 		ScreenWidth = Rect.Width;
 		ScreenHeight = Rect.Height;
@@ -315,14 +376,21 @@ void FEditorViewportInputService::HandleMessage(
 
 	case WM_MOUSEMOVE:
 	{
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
+		FViewportId HoveredId = Slate->GetHoveredViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(HoveredId);
 		if (!Viewport)
 		{
 			Gizmo.ClearHover();
 			return;
 		}
 
-		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
+		ULevel* Level = GetLevelForViewport(HoveredId);
+		if (!Level)
+		{
+			return;
+		}
+
+		FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 		const FRect& Rect = Viewport->GetRect();
 		ScreenWidth = Rect.Width;
 		ScreenHeight = Rect.Height;
@@ -350,10 +418,11 @@ void FEditorViewportInputService::HandleMessage(
 		}
 
 		Gizmo.EndDrag();
-		FViewport* Viewport = ViewportRegistry.GetViewportById(Slate->GetHoveredViewportId());
+		FViewportId HoveredId = Slate->GetHoveredViewportId();
+		FViewport* Viewport = ViewportRegistry.GetViewportById(HoveredId);
 		if (Viewport)
 		{
-			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(Slate->GetHoveredViewportId());
+			FViewportEntry* HoveredEntry = ViewportRegistry.FindEntryByViewportID(HoveredId);
 			const FRect& Rect = Viewport->GetRect();
 			ScreenWidth = Rect.Width;
 			ScreenHeight = Rect.Height;
