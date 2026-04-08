@@ -44,6 +44,8 @@ public:
 	virtual FRenderMesh* GetRenderMesh() const override;
 	FDynamicMesh* GetSubUVMesh() const { return SubUVMesh.get(); }
 
+	virtual void FixupReferences(const FDuplicateionContext& Context) override;
+
 private:
 	FVector2 Size = FVector2(1.f, 1.f);
 	FVector4 Color = FVector4(1.0f, 1.0f, 1.0f, 1.0f);

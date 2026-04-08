@@ -28,6 +28,8 @@ public:
 	FDynamicMesh* GetBillboardMesh() const { return BillboardMesh.get(); }
 	FDynamicMaterial* GetMaterialInstance() const { return MaterialInstance.get(); }
 
+	virtual void FixupReferences(const FDuplicateionContext& Context) override;
+
 	void SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture);
 	void ResetMaterial(const FString& MaterialName);
 

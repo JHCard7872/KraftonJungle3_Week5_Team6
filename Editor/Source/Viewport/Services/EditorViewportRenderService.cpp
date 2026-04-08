@@ -158,7 +158,8 @@ void FEditorViewportRenderService::RenderAll(
 		{
 			// [수정]: PIE 중에도 일반 액터(StaticMesh 등)의 UUID는 보이도록 SF_UUID를 유지하거나 켭니다.
 			// 카메라 액터의 UUID는 RenderCollector에서 개별적으로 숨겨집니다.
-			RenderShowFlags.SetFlag(EEngineShowFlags::SF_Billboard, false);
+			// [수정]: PIE 중에도 게임용 빌보드(SubUV 등)가 보일 수 있도록 SF_Billboard는 끄지 않습니다.
+			// 에디터 아이콘 등은 IsEditorOnly() 체크와 SF_EditorActorVisualization에 의해 필터링됩니다.
 			RenderShowFlags.SetFlag(EEngineShowFlags::SF_EditorActorVisualization, false);
 			
 			// 에디터 설정에서 UUID가 켜져있다면 PIE 화면에서도 강제로 출력되도록 보장

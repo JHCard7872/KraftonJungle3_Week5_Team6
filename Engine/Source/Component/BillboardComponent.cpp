@@ -35,6 +35,18 @@ FRenderMesh* UBillboardComponent::GetRenderMesh() const
 	return BillboardMesh.get();
 }
 
+void UBillboardComponent::FixupReferences(const FDuplicateionContext& Context)
+{
+	UPrimitiveComponent::FixupReferences(Context);
+
+	// 2. 포인터 공유 방지 (PIE 복제본에게만 새 리소스 발급)
+	this->BillboardMesh = std::make_shared<FDynamicMesh>();
+	if (this->MaterialInstance)
+	{
+		this->MaterialInstance = this->MaterialInstance->CreateDynamicMaterial();
+	}
+}
+
 void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture)
 {
 	if (MaterialInstance)

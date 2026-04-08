@@ -13,6 +13,14 @@ void USubUVComponent::PostConstruct()
 
 FRenderMesh* USubUVComponent::GetRenderMesh() const { return SubUVMesh.get(); }
 
+void USubUVComponent::FixupReferences(const FDuplicateionContext& Context)
+{
+	UPrimitiveComponent::FixupReferences(Context);
+
+	// 2. 포인터 공유 방지 (PIE 복제본에게만 새 메시 발급)
+	this->SubUVMesh = std::make_shared<FDynamicMesh>();
+}
+
 FBoxSphereBounds USubUVComponent::GetWorldBounds() const
 {
 	const FVector Center = GetWorldLocation();
