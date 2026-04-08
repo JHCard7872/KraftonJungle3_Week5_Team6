@@ -1,6 +1,10 @@
 #include "Material.h"
 #include "Shader.h"
+#include "MaterialManager.h"
+#include "Object/Class.h"
 #include <cstring>
+#include "Renderer/Texture.h"
+#include "Object/ObjectFactory.h"
 
 
 FMaterialTexture::~FMaterialTexture()
@@ -275,6 +279,53 @@ void FMaterial::Release()
 	for (auto& CB : ConstantBuffers)
 	{
 		CB.Release();
+
+
 	}
 	ConstantBuffers.clear();
+}
+
+IMPLEMENT_RTTI(UMaterial, UObject);
+
+UMaterial::~UMaterial()
+{
+	if (Diffuse)
+	{
+		delete Diffuse;
+		Diffuse = nullptr;
+	}
+}
+
+void UMaterial::PostConstruct()
+{
+	Diffuse = FObjectFactory::ConstructObject<UTexture>(this, "Diffuse");
+	UObject::PostConstruct();
+}
+
+void UMaterial::SetDiffuse(FMaterialTexture* InTex)
+{
+	if (Diffuse)
+		Diffuse->SetResource(InTex);
+	else
+		Diffuse = FObjectFactory::ConstructObject<UTexture>(this, "Diffuse");
+}
+
+void UMaterial::SetDiffuse(UTexture* InTex)
+{
+	if (Diffuse)
+		Diffuse->SetResource(InTex ? InTex->GetResource() : nullptr);
+	else if (InTex)
+	{
+		Diffuse = InTex;
+	}
+}
+
+FMaterial* UMaterial::GetRenderMaterial()
+{
+	return RenderMaterial.get();
+}
+
+void UMaterial::UpdateMaterial()
+{
+	/** 확장용 임시 함수 */
 }

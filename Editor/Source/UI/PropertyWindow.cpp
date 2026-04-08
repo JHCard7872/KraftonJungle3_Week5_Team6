@@ -170,7 +170,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							BillboardComp->SetBillboard(bBillboard);
 
 						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
-						FDynamicMaterial* Mat = BillboardComp->GetMaterialInstance();
+						FMaterial* Mat = BillboardComp->GetBaseMaterial()->GetRenderMaterial();
 						std::string CurrentMatName = Mat->GetMaterialTexture() ? Mat->GetOriginName() : "None";
 
 						ImGui::PushItemWidth(180.f);

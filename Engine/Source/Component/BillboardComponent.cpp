@@ -5,8 +5,18 @@
 #include "Renderer/MaterialManager.h"
 #include "Object/Object.h"
 #include "Object/Class.h"
+#include "Object/ObjectFactory.h"
 
 IMPLEMENT_RTTI(UBillboardComponent, UPrimitiveComponent)
+
+UBillboardComponent::~UBillboardComponent()
+{
+	if (BaseMaterial)
+	{
+		delete BaseMaterial;
+		BaseMaterial = nullptr;
+	}
+}
 
 void UBillboardComponent::PostConstruct()
 {
@@ -14,7 +24,8 @@ void UBillboardComponent::PostConstruct()
 	bBillboard = true;
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
-	MaterialInstance = FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial();
+	BaseMaterial = FObjectFactory::ConstructObject<UMaterial>(this, GetName() + "_Mat");
+	BaseMaterial->SetRenderMaterial(FMaterialManager::Get().FindByName("M_Default_Texture"));
 }
 
 FBoxSphereBounds UBillboardComponent::GetWorldBounds() const
@@ -37,9 +48,10 @@ FRenderMesh* UBillboardComponent::GetRenderMesh() const
 
 void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture)
 {
-	if (MaterialInstance)
+	if (BaseMaterial && BaseMaterial->GetRenderMaterial())
 	{
-		MaterialInstance->SetMaterialTexture(InTexture);
+		BaseMaterial->SetDiffuse(InTexture.get());
+		BaseMaterial->GetRenderMaterial()->SetMaterialTexture(InTexture);
 	}
 }
 
@@ -53,5 +65,5 @@ void UBillboardComponent::CopyPropertiesFrom(const UObject* Source)
 	this->bBillboard = SourceComp->bBillboard;
 
 	this->BillboardMesh = SourceComp->BillboardMesh;
-	this->MaterialInstance = SourceComp->MaterialInstance;
+	this->BaseMaterial = SourceComp->BaseMaterial;
 }
