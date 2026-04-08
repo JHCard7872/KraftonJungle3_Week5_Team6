@@ -128,6 +128,7 @@ void FEditorEngine::StartPIE()
 				ACameraActor* CameraActor = static_cast<ACameraActor*>(Actor);
 				if (UCameraComponent* CameraComponent = CameraActor->GetCameraComponent())
 				{
+					CameraComponent->ApplyComponentTransformToCamera();
 					PIEWorld->SetActiveCameraComponent(CameraComponent);
 					UE_LOG("[PIE] Camera possession: ACameraActor");
 					bPossessedCameraActor = true;
@@ -523,9 +524,9 @@ void FEditorEngine::RenderFrame()
 			if (Entry && Entry->Viewport)
 			{
 				const FRect& Rect = Entry->Viewport->GetRect();
+				UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
 				if (Rect.Width > 0 && Rect.Height > 0)
 				{
-					UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
 					if (PIEWorld)
 					{
 						if (UCameraComponent* Cam = PIEWorld->GetActiveCameraComponent())

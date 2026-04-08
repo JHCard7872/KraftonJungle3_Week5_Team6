@@ -13,6 +13,7 @@
 #include "Component/BillboardComponent.h"
 #include "Component/ActorComponent.h"
 #include "Component/SceneComponent.h"
+#include "Component/PrimitiveComponent.h"
 
 void FPropertyWindow::SetTarget(const FVector& Location, const FVector& Rotation,
                                 const FVector& Scale, const char* ActorName)
@@ -154,6 +155,8 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 				{
 					if (SelectedComponent == PendingRemove)
 						SelectedComponent = nullptr;
+					if (PendingRemove->IsA(USceneComponent::StaticClass()))
+						static_cast<USceneComponent*>(PendingRemove)->DetachFromParent();
 					SelectedActor->RemoveOwnedComponent(PendingRemove);
 					PendingRemove->MarkPendingKill();
 				}
@@ -192,9 +195,14 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 					}
 					if (NewComp)
 					{
+						USceneComponent* AttachParent = SelectedActor->GetRootComponent();
 						SelectedActor->AddOwnedComponent(NewComp);
-						NewComp->AttachTo(SelectedActor->GetRootComponent());
+						if (AttachParent && AttachParent != NewComp)
+							NewComp->AttachTo(AttachParent);
 						NewComp->OnRegister();
+						if (NewComp->IsA(UPrimitiveComponent::StaticClass()))
+							static_cast<UPrimitiveComponent*>(NewComp)->UpdateBounds();
+						SelectedComponent = NewComp;
 					}
 				}
 
@@ -270,8 +278,8 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							BillboardComp->SetBillboard(bBillboard);
 
 						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
-						FMaterial* Mat = BillboardComp->GetBaseMaterial()->GetRenderMaterial();
-						std::string CurrentMatName = Mat->GetMaterialTexture() ? Mat->GetOriginName() : "None";
+						FMaterial* Mat = BillboardComp->GetMaterialInstance();
+						std::string CurrentMatName = (Mat && Mat->GetMaterialTexture()) ? Mat->GetOriginName() : "None";
 						
 						ImGui::PushItemWidth(180.f);
 						if (ImGui::BeginCombo("Sprite", CurrentMatName.c_str()))

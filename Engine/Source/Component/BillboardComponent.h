@@ -3,15 +3,14 @@
 #include "Component/PrimitiveComponent.h"
 
 struct FDynamicMesh;
+class FDynamicMaterial;
 struct FMaterialTexture;
-class UMaterial;
 
 class ENGINE_API UBillboardComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(UBillboardComponent, UPrimitiveComponent)
 	GENERATE_SHALLOW_CLONE(UBillboardComponent)
-	~UBillboardComponent() override;
 	void PostConstruct() override;
 
 	virtual FBoxSphereBounds GetWorldBounds() const override;
@@ -27,7 +26,7 @@ public:
 
 	virtual FRenderMesh* GetRenderMesh() const override;
 	FDynamicMesh* GetBillboardMesh() const { return BillboardMesh.get(); }
-	UMaterial* GetBaseMaterial() const { return BaseMaterial; }
+	FDynamicMaterial* GetMaterialInstance() const { return MaterialInstance.get(); }
 
 	void SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture);
 	void ResetMaterial(const FString& MaterialName);
@@ -38,5 +37,5 @@ private:
 	bool bBillboard = false;
 	bool bEditorOnly = false;
 	std::shared_ptr<FDynamicMesh> BillboardMesh;
-	UMaterial* BaseMaterial = nullptr;
+	std::shared_ptr<FDynamicMaterial> MaterialInstance;
 };

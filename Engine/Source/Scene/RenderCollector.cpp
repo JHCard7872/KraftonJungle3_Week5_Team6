@@ -199,11 +199,8 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 			if (BillboardMesh && SubUVRenderer.BuildSubUVMesh(BillboardComp->GetSize(), *BillboardMesh))
 			{
 				BillboardMesh->bIsDirty = true;
-
-				UMaterial* BaseMat = BillboardComp->GetBaseMaterial();
-				FMaterial* BillboardMat = BaseMat ? BaseMat->GetRenderMaterial() : nullptr;
-
-				if (BillboardMat && BillboardMat->GetMaterialTexture())
+				FMaterial* BillboardMat = BillboardComp->GetMaterialInstance();
+				if (BillboardMat)
 				{
 					FRenderCommand Command;
 					Command.RenderMesh = BillboardMesh;
