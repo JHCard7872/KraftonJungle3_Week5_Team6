@@ -21,6 +21,7 @@ public:
 
 	void StartPIE();
 	void EndPIE();
+	void RequestEndPIE() { bRequestEndPIE = true; }
 	bool IsPlayingInEditor() const { return PIEWorldContext != nullptr; }
 
 	void Shutdown() override;
@@ -112,4 +113,5 @@ private:
 
 	std::unique_ptr<FSlateApplication> SlateApplication = nullptr;
 	bool bPIEJustCaptured = false;
+	bool bRequestEndPIE = false;
 };

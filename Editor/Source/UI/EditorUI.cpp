@@ -911,7 +911,7 @@ void FEditorUI::Render()
 			{
 				if (bIsPlaying)
 				{
-					Engine->EndPIE();
+					Engine->RequestEndPIE();
 				}
 				else
 				{

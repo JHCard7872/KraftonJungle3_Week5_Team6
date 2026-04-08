@@ -108,6 +108,7 @@ void FEditorViewportRenderService::RenderAll(
 
 		if (EditorEngine->IsPlayingInEditor())
 		{
+			// [분할 PIE 복구]: PIE용 뷰포트만 라이브 레벨을 사용하고, 나머지는 에디터 레벨(정지)을 사용
 			if (Entry.Id == PIEViewportId)
 			{
 				TargetLevel = EditorEngine->GetActiveLevel(); // PIE 라이브 레벨
@@ -148,15 +149,23 @@ void FEditorViewportRenderService::RenderAll(
 		Frustum.ExtractFromVP(Queue.ViewMatrix * Queue.ProjectionMatrix);
 		const FVector CameraPosition = Queue.ViewMatrix.GetInverse().GetTranslation();
 
-		// PIE 뷰포트라면 게임 화면처럼 보이기 위해 에디터 요소(UUID, 빌보드 등) 플래그를 끈 복사본을 사용한다.
+		// PIE 상태라면 모든 뷰포트에서 에디터 요소(빌보드, UUID, 시각화 아이콘 등) 플래그를 끈다.
 		FShowFlags RenderShowFlags = Entry.LocalState.ShowFlags;
 		const bool bIsPIE = EditorEngine->IsPlayingInEditor();
 		const bool bIsPIEViewport = bIsPIE && (Entry.Id == PIEViewportId);
 
-		if (bIsPIEViewport)
+		if (bIsPIE)
 		{
-			// UUID는 PIE 중에도 보이도록 유지 (기존 SF_UUID 끄는 로직 제거)
+			// [수정]: PIE 중에도 일반 액터(StaticMesh 등)의 UUID는 보이도록 SF_UUID를 유지하거나 켭니다.
+			// 카메라 액터의 UUID는 RenderCollector에서 개별적으로 숨겨집니다.
 			RenderShowFlags.SetFlag(EEngineShowFlags::SF_Billboard, false);
+			RenderShowFlags.SetFlag(EEngineShowFlags::SF_EditorActorVisualization, false);
+			
+			// 에디터 설정에서 UUID가 켜져있다면 PIE 화면에서도 강제로 출력되도록 보장
+			if (Entry.LocalState.ShowFlags.HasFlag(EEngineShowFlags::SF_UUID))
+			{
+				RenderShowFlags.SetFlag(EEngineShowFlags::SF_UUID, true);
+			}
 		}
 
 		BuildRenderCommands(Engine, TargetLevel, Frustum, RenderShowFlags, CameraPosition, Queue);
@@ -164,6 +173,7 @@ void FEditorViewportRenderService::RenderAll(
 		AActor* GizmoTarget = EditorEngine->GetSelectedActor();
 		const bool bGizmoTargetInCorrectWorld = GizmoTarget && (GizmoTarget->GetLevel() == TargetLevel);
 
+		// [수정]: PIE 메인 뷰포트가 아닐 때만 기즈모를 렌더링 (나머지 3개 에디터 뷰포트용)
 		if (bGizmoTargetInCorrectWorld && GizmoTarget->GetComponentByClass<USkyComponent>() == nullptr && !bIsPIEViewport)
 		{
 			Gizmo.BuildRenderCommands(GizmoTarget, &Entry, Queue);
@@ -174,6 +184,7 @@ void FEditorViewportRenderService::RenderAll(
 			ApplyWireframe(Queue, WireFrameMaterial.get());
 		}
 
+		// [수정]: PIE 메인 뷰포트가 아닐 때만 그리드를 렌더링 (또는 에디터 설정에 따라)
 		if (Entry.LocalState.bShowGrid && GridMesh && GridMaterial && !bIsPIEViewport)
 		{
 			FVector GridAxisU = FVector::ForwardVector;

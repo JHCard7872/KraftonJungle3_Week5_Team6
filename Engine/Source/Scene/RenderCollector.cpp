@@ -2,6 +2,7 @@
 #include "Component/UUIDBillboardComponent.h"
 #include "Renderer/RenderCommand.h"
 #include "Actor/Actor.h"
+#include "Actor/CameraActor.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/SubUVComponent.h"
 #include "Core/Engine.h"
@@ -267,6 +268,15 @@ void FLevelRenderCollector::FrustrumCull(const TArray<AActor*>& Actors, const FF
 			if (bIsUUID)
 			{
 				if (!ShowFlags.HasFlag(EEngineShowFlags::SF_UUID)) continue;
+
+				// [수정]: PIE 중에는 카메라 액터의 UUID만 특별히 숨긴다.
+				if (Actor->GetWorld()->GetWorldType() == EWorldType::PIE)
+				{
+					if (Actor->IsA(ACameraActor::StaticClass()))
+					{
+						continue;
+					}
+				}
 			}
 			else if (bIsCameraArrow)
 			{

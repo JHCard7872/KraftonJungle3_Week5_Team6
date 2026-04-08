@@ -284,6 +284,7 @@ void FEditorViewportInputService::HandleMessage(
 	{
 		if (bIsPlaying)
 		{
+			// [분할 PIE 복구]: PIE 메인 뷰포트 클릭 시에는 PIE 레벨을, 나머지는 에디터 레벨을 반환
 			if (ViewportId == PIEViewportId)
 			{
 				return EditorEngine->GetActiveLevel();
