@@ -3,6 +3,8 @@
 #include "imgui.h"
 #include <functional>
 class FEditorEngine;
+class UActorComponent;
+class USceneComponent;
 using FPropertyChangedCallback = std::function<void(const FVector&, const FVector&, const FVector&)>;
 
 class FPropertyWindow
@@ -18,6 +20,7 @@ public:
 	FVector GetScale()      const { return EditScale; }
 
 	void SetOnChanged(FPropertyChangedCallback Callback) { OnChanged = Callback; }
+	void DrawComponentTree(USceneComponent *Comp, int Depth);
 
 	FPropertyChangedCallback OnChanged;
 private:
@@ -28,4 +31,7 @@ private:
 	FVector EditScale = { 1.0f, 1.0f, 1.0f };
 	char    ActorNameBuf[128] = "None";
 	bool    bModified = false;
+
+	UActorComponent *SelectedComponent = nullptr;
+	UActorComponent *PendingRemove = nullptr;
 };
