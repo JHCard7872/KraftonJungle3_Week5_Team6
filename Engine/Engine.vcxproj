@@ -22,6 +22,7 @@
     <ClInclude Include="Source\Actor\BillboardActor.h" />
     <ClInclude Include="Source\Component\BillboardComponent.h" />
     <ClInclude Include="Source\Actor\CameraActor.h" />
+    <ClInclude Include="Source\Component\CameraArrowComponent.h" />
     <ClInclude Include="Source\CoreMinimal.h" />
     <ClInclude Include="Source\Core\GameViewportClient.h" />
     <ClInclude Include="Source\EngineAPI.h" />
@@ -233,6 +234,7 @@
     <ClCompile Include="Source\Asset\ObjManager.cpp" />
     <ClCompile Include="Source\Camera\Camera.cpp" />
     <ClCompile Include="Source\Component\ActorComponent.cpp" />
+    <ClCompile Include="Source\Component\CameraArrowComponent.cpp" />
     <ClCompile Include="Source\Component\CameraComponent.cpp" />
     <ClCompile Include="Source\Component\LineBatchComponent.cpp" />
     <ClCompile Include="Source\Component\MeshComponent.cpp" />

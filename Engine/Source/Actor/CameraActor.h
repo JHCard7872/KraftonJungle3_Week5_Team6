@@ -3,6 +3,8 @@
 #include "Actor/Actor.h"
 
 class UCameraComponent;
+class UBillboardComponent;
+class UCameraArrowComponent;
 
 /*
 레벨에 배치 가능한 카메라 액터.
@@ -22,4 +24,6 @@ public:
 
 private:
 	UCameraComponent* CameraComponent = nullptr;
+	UBillboardComponent* IconBillboard = nullptr;
+	UCameraArrowComponent* ArrowX = nullptr;
 };

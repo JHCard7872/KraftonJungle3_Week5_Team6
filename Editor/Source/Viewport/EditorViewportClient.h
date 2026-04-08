@@ -44,6 +44,10 @@ public:
 	const FFrustum& Frustum, const FShowFlags& Flags, const FVector& CameraPosition, FRenderCommandQueue& OutQueue) override;
 	void Render(FEngine* Engine, FRenderer* Renderer);
 
+	/** PIE 그리드 렌더링용: GridMesh/GridMaterial 외부 접근 허용 */
+	FDynamicMesh* GetGridMesh() const { return GridMesh.get(); }
+	FMaterial* GetGridMaterial() const { return GridMaterial.get(); }
+
 private:
 	FEditorUI& EditorUI;
 	mutable FGizmo Gizmo;

@@ -35,4 +35,5 @@ private:
 	TArray<FDebugCube> Cubes;
 	bool bDrawWorldAxis = false;
 	void DrawAllCollisionBounds(FRenderer* Renderer, UWorld* World);
+	void DrawCameraActors(FRenderer* Renderer, UWorld* World);
 };

@@ -35,12 +35,13 @@ void FEditorViewportClient::Attach(FEngine* Engine, FRenderer* Renderer)
 	EditorUI.Initialize(EditorEngine);
 	EditorUI.AttachToRenderer(Renderer); // bViewportClientActive 가드: 이미 활성이면 no-op
 
-	// PIE 전환 후 복귀 시 Detach가 리소스를 해제하지 않으므로
-	// GridMesh가 이미 있으면 재생성하지 않는다.
+	// BlitRenderer는 Detach에서 해제되므로 항상 재초기화한다.
+	BlitRenderer.Initialize(Renderer->GetDevice());
+	WireFrameMaterial = FMaterialManager::Get().FindByName(WireframeMaterialName);
+
+	// Grid 리소스는 PIE 전환 후에도 살아 있으므로 없을 때만 생성한다.
 	if (!GridMesh)
 	{
-		BlitRenderer.Initialize(Renderer->GetDevice());
-		WireFrameMaterial = FMaterialManager::Get().FindByName(WireframeMaterialName);
 		CreateGridResource(Renderer);
 	}
 
@@ -129,9 +130,8 @@ void FEditorViewportClient::Detach(FEngine* Engine, FRenderer* Renderer)
 	//EditorUI.DetachFromRenderer(Renderer);
 
 	BlitRenderer.Release();
-
-	GridMesh.reset();
-	GridMaterial.reset();
+	// GridMesh / GridMaterial은 PIE 중에도 EditorEngine이 재사용하므로 해제하지 않는다.
+	// Attach()의 if (!GridMesh) 가드가 재진입 시 중복 생성을 방지한다.
 }
 
 void FEditorViewportClient::Tick(FEngine* Engine, float DeltaTime)

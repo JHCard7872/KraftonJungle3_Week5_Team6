@@ -15,7 +15,7 @@ void* FMalloc::Malloc(SIZE_T Count)
 	if (TotalSize < Count)
 		abort();
 
-	void* Raw = std::malloc(TotalSize);
+	void* Raw = std ::malloc(TotalSize);
 	if (!Raw)
 		abort(); // OOM
 
