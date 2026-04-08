@@ -196,10 +196,11 @@ public:
 	bool SetVector3Parameter(const FString& ParamName, const FVector& Value);
 };
 
-class UMaterial : public UObject
+class ENGINE_API UMaterial : public UObject
 {
 public:
 	DECLARE_RTTI(UMaterial, UObject)
+	~UMaterial() override;
 
 	void PostConstruct() override;
 
@@ -207,7 +208,7 @@ public:
 	void SetDiffuse(UTexture* InTex);
 	UTexture* GetDiffuse() const { return Diffuse; }
 
-	void SetRenderMaterial(FMaterial* InMat) { RenderMaterial = InMat; }
+	void SetRenderMaterial(std::shared_ptr<FMaterial> InMat) { RenderMaterial = InMat; }
 	FMaterial* GetRenderMaterial();
 
 	void UpdateMaterial();
@@ -215,5 +216,5 @@ public:
 private:
 	// Override 용으로 Diffuse 텍스처 포인터를 보관. UTexture는 UObject 계열이므로 별도 관리 필요.
 	UTexture* Diffuse = nullptr;
-	FMaterial* RenderMaterial = nullptr;
+	std::shared_ptr<FMaterial> RenderMaterial;
 };

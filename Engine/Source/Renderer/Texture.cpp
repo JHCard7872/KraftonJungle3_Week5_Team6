@@ -1,9 +1,5 @@
 #include "Texture.h"
+#include "Renderer/Material.h"
+#include "Object/Class.h"
 
-void UTexture::UpdateResource()
-{
-}
-
-void UTexture::ReleaseResource()
-{
-}
+IMPLEMENT_RTTI(UTexture, UObject);

@@ -4,7 +4,7 @@
 
 class FMaterialTexture;
 
-class UTexture : public UObject
+class ENGINE_API UTexture : public UObject
 {
 public:
 	DECLARE_RTTI(UTexture, UObject)
@@ -12,14 +12,13 @@ public:
 	int32_t GetWidth()  const { return Width; }
 	int32_t GetHeight() const { return Height; }
 
+	void SetResource(FMaterialTexture* InResource) { Resource = InResource; }
 	FMaterialTexture* GetResource() const { return Resource; }
-
-	void UpdateResource();   // GPU resource 생성/갱신
-	void ReleaseResource();  // GPU resource 해제
 
 protected:
 	int32_t Width = 0;
 	int32_t Height = 0;
 
+	/** 참조용으로만 들고 있으므로 메모리 관리 필요x */
 	FMaterialTexture* Resource = nullptr;
 };

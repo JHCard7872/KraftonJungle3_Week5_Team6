@@ -6,11 +6,15 @@
 struct FDynamicMesh;
 class FDynamicMaterial;
 struct FMaterialTexture;
+class UTexture;
+class UMaterial;
 
 class ENGINE_API UBillboardComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(UBillboardComponent, UPrimitiveComponent)
+	~UBillboardComponent() override;
+	
 	void PostConstruct() override;
 
 	virtual FBoxSphereBounds GetWorldBounds() const override;
@@ -25,7 +29,7 @@ public:
 	/** SubUV 렌더링용 메시 데이터 반환 */
 	virtual FRenderMesh* GetRenderMesh() const override;
 	FDynamicMesh* GetBillboardMesh() const { return BillboardMesh.get(); }
-	FDynamicMaterial* GetMaterialInstance() const { return MaterialInstance.get(); }
+	UMaterial* GetBaseMaterial() const { return BaseMaterial; }
 
 	void SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture);
 
@@ -39,6 +43,6 @@ private:
 
 	/** 동적 메시 데이터 */
 	std::shared_ptr<FDynamicMesh> BillboardMesh;
-	std::shared_ptr<FDynamicMaterial> MaterialInstance;
+	UMaterial* BaseMaterial = nullptr;
 };
 

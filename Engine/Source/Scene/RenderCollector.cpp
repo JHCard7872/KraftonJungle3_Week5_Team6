@@ -11,6 +11,7 @@
 #include "Renderer/TextMeshBuilder.h"
 #include "Renderer/SubUVRenderer.h"
 #include "Renderer/Material.h"
+#include "Renderer/Texture.h"
 #include "Renderer/MeshData.h"
 #include "Component/BillboardComponent.h"
 
@@ -180,7 +181,14 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 			if (BillboardMesh && SubUVRenderer.BuildSubUVMesh(BillboardComp->GetSize(), *BillboardMesh))
 			{
 				BillboardMesh->bIsDirty = true;
-				FMaterial* BillboardMat = BillboardComp->GetMaterialInstance();
+				
+				UMaterial* BaseMat = BillboardComp->GetBaseMaterial();
+				FMaterial* BillboardMat = BaseMat->GetRenderMaterial();
+
+				/*
+				FMaterialTexture* Test = BaseMat->GetDiffuse()->GetResource();
+				BillboardMat->SetMaterialTexture(std::shared_ptr<FMaterialTexture>(Test));
+				*/
 
 				if (BillboardMat && BillboardMat->GetMaterialTexture())
 				{
