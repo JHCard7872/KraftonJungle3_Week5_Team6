@@ -151,48 +151,10 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 				ImGui::Indent(8.0f);
 
 				// ─── 컴포넌트 목록 ───
-				UActorComponent* PendingRemove = nullptr;
+				PendingRemove = nullptr;
 
-				for (UActorComponent* Component : SelectedActor->GetComponents())
-				{
-					if (!Component) continue;
-
-					const char* TypeName = nullptr;
-					if (Component->IsA(USubUVComponent::StaticClass()))
-						TypeName = "SubUVComponent";
-					else if (Component->IsA(UTextRenderComponent::StaticClass())
-						&& !Component->IsA(UUUIDBillboardComponent::StaticClass()))
-						TypeName = "TextRenderComponent";
-					else if (Component->IsA(UStaticMeshComponent::StaticClass()))
-						TypeName = "StaticMeshComponent";
-					else if (Component->IsA(UBillboardComponent::StaticClass()))
-						TypeName = "BillboardComponent";
-					else
-						continue;
-
-					ImGui::PushID(Component);
-
-					bool bIsSelected = (SelectedComponent == Component);
-					ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_Leaf
-						| ImGuiTreeNodeFlags_NoTreePushOnOpen
-						| ImGuiTreeNodeFlags_SpanAvailWidth;
-					if (bIsSelected)
-						Flags |= ImGuiTreeNodeFlags_Selected;
-
-					ImGui::TreeNodeEx(TypeName, Flags);
-
-					if (ImGui::IsItemClicked())
-						SelectedComponent = Component;
-
-					if (ImGui::BeginPopupContextItem("##CompContext"))
-					{
-						if (ImGui::MenuItem("Delete"))
-							PendingRemove = Component;
-						ImGui::EndPopup();
-					}
-
-					ImGui::PopID();
-				}
+				 if (USceneComponent *Root = SelectedActor->GetRootComponent())
+					DrawComponentTree(Root, 0);
 
 				// 루프 밖에서 삭제
 				if (PendingRemove)
@@ -532,4 +494,74 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 		}
 	}
 	ImGui::End();
+}
+
+void FPropertyWindow::DrawComponentTree(USceneComponent *Comp, int Depth)
+{
+	if (!Comp)
+		return;
+
+	/** UUID 는 수정 대상 X */
+	if (Comp->IsA(UUUIDBillboardComponent::StaticClass()))
+		return;
+
+	const char *TypeName = "SceneComponent";
+	if (Comp->IsA(USubUVComponent::StaticClass()))
+		TypeName = "SubUVComponent";
+	else if (Comp->IsA(UTextRenderComponent::StaticClass()) && !Comp->IsA(UUUIDBillboardComponent::StaticClass()))
+		TypeName = "TextRenderComponent";
+	else if (Comp->IsA(UStaticMeshComponent::StaticClass()))
+		TypeName = "StaticMeshComponent";
+	else if (Comp->IsA(UBillboardComponent::StaticClass()))
+		TypeName = "BillboardComponent";
+
+	ImGui::PushID(Comp);
+
+	bool bIsSelected = (SelectedComponent == Comp);
+	bool bHasChildren = !Comp->GetAttachChildren().empty();
+
+	ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow;
+	if (bIsSelected)
+		Flags |= ImGuiTreeNodeFlags_Selected;
+	if (!bHasChildren)
+		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+	// Root 표시
+	if (Depth == 0)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.3f, 1.0f));
+		bool bOpen = ImGui::TreeNodeEx(TypeName, Flags);
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemClicked())
+			SelectedComponent = Comp;
+		if (bHasChildren && bOpen)
+		{
+			for (USceneComponent *Child : Comp->GetAttachChildren())
+				DrawComponentTree(Child, Depth + 1);
+			ImGui::TreePop();
+		}
+	}
+	else
+	{
+		bool bOpen = ImGui::TreeNodeEx(TypeName, Flags);
+		if (ImGui::IsItemClicked())
+			SelectedComponent = Comp;
+		if (bHasChildren && bOpen)
+		{
+			for (USceneComponent *Child : Comp->GetAttachChildren())
+				DrawComponentTree(Child, Depth + 1);
+			ImGui::TreePop();
+		}
+	}
+
+	if (ImGui::BeginPopupContextItem("##CompContext"))
+	{
+		if (ImGui::MenuItem("Delete") && Depth > 0) // Root는 삭제 못하게
+		{
+			PendingRemove = Comp;
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::PopID();
 }

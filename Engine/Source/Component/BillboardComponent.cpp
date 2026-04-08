@@ -54,16 +54,3 @@ void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InT
 		BaseMaterial->GetRenderMaterial()->SetMaterialTexture(InTexture);
 	}
 }
-
-void UBillboardComponent::CopyPropertiesFrom(const UObject* Source)
-{
-	UPrimitiveComponent::CopyPropertiesFrom(Source);
-	const UBillboardComponent* SourceComp = static_cast<const UBillboardComponent*>(Source);
-
-	this->Size = SourceComp->Size;
-	this->Color = SourceComp->Color;
-	this->bBillboard = SourceComp->bBillboard;
-
-	this->BillboardMesh = SourceComp->BillboardMesh;
-	this->BaseMaterial = SourceComp->BaseMaterial;
-}

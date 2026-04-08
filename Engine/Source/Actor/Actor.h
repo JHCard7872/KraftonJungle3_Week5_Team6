@@ -12,6 +12,7 @@ class ENGINE_API AActor : public UObject
 {
 public:
 	DECLARE_RTTI(AActor, UObject)
+	GENERATE_SHALLOW_CLONE(AActor);
 	~AActor() override = default;
 
 	/** 자신이 속한 씬을 반환한다. */
@@ -77,7 +78,6 @@ public:
 
 	void FixupReferences(const FDuplicateionContext& Context) override;
 protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 	void DuplicateSubObjects(FDuplicateionContext& Context) override;
 
 protected:

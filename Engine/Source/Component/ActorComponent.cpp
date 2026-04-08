@@ -37,17 +37,3 @@ void UActorComponent::FixupReferences(const FDuplicateionContext& Context)
 		this->Owner = static_cast<AActor*>(Context.GetMappedObject(this->Owner.Get()));
 	}
 }
-
-void UActorComponent::CopyPropertiesFrom(const UObject* Source)
-{
-	UObject::CopyPropertiesFrom(Source);
-
-	const UActorComponent* SourceComp = static_cast<const UActorComponent*>(Source);
-
-	this->bRegistered = SourceComp->bRegistered;
-	this->bBegunPlay = SourceComp->bBegunPlay;
-	this->bCanEverTick = SourceComp->bCanEverTick;
-	this->bTickEnabled = SourceComp->bTickEnabled;
-
-	this->Owner = SourceComp->Owner;
-}

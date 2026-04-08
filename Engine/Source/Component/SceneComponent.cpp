@@ -98,19 +98,6 @@ void USceneComponent::Serialize(FArchive& Ar)
 	}
 }
 
-void USceneComponent::CopyPropertiesFrom(const UObject* Source)
-{
-	UActorComponent::CopyPropertiesFrom(Source);
-
-	const USceneComponent* SourceComp = static_cast<const USceneComponent*>(Source);
-
-	this->RelativeTransform = SourceComp->RelativeTransform;
-	this->bWorldTransformDirty = true;
-
-	this->AttachParent = SourceComp->AttachParent;
-	this->AttachChildren = SourceComp->AttachChildren;
-}
-
 void USceneComponent::FixupReferences(const FDuplicateionContext& Context)
 {
 	UActorComponent::FixupReferences(Context);
@@ -124,6 +111,9 @@ void USceneComponent::FixupReferences(const FDuplicateionContext& Context)
 	{
 		this->AttachChildren[i] = static_cast<USceneComponent*>(Context.GetMappedObject(this->AttachChildren[i]));
 	}
+
+	// 참조가 변경되었으므로 트랜스폼을 다시 계산하도록 마킹
+	MarkTransformDirty();
 }
 
 FVector USceneComponent::GetWorldLocation() const

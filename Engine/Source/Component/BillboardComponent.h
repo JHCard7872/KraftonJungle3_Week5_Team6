@@ -13,8 +13,8 @@ class ENGINE_API UBillboardComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(UBillboardComponent, UPrimitiveComponent)
+	GENERATE_SHALLOW_CLONE(UBillboardComponent);
 	~UBillboardComponent() override;
-	
 	void PostConstruct() override;
 
 	virtual FBoxSphereBounds GetWorldBounds() const override;
@@ -32,9 +32,6 @@ public:
 	UMaterial* GetBaseMaterial() const { return BaseMaterial; }
 
 	void SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture);
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	FVector2 Size = FVector2(1.f, 1.f);

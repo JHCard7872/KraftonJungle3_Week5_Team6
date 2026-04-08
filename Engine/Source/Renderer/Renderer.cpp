@@ -115,6 +115,22 @@ void FRenderer::BindSwapChainRTV()
 	}
 }
 
+void FRenderer::SetRenderViewport(float X, float Y, float Width, float Height, float MinDepth, float MaxDepth)
+{
+	D3D11_VIEWPORT VP = {};
+	VP.TopLeftX = X;
+	VP.TopLeftY = Y;
+	VP.Width = Width;
+	VP.Height = Height;
+	VP.MinDepth = MinDepth;
+	VP.MaxDepth = MaxDepth;
+
+	if (DeviceContext)
+	{
+		DeviceContext->RSSetViewports(1, &VP);
+	}
+}
+
 void FRenderer::SetGUICallbacks(
 	FGUICallback InInit,
 	FGUICallback InShutdown,
