@@ -138,6 +138,13 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 	if (Engine)
 	{
 		AActor* SelectedActor = Engine->GetSelectedActor();
+
+		if (PrevSelectedActor != SelectedActor)
+		{
+			SelectedComponent = nullptr;
+			PrevSelectedActor = SelectedActor;
+		}
+
 		if (SelectedActor)
 		{
 			if (ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen))
@@ -500,6 +507,10 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 void FPropertyWindow::DrawComponentTree(USceneComponent *Comp, int Depth)
 {
 	if (!Comp)
+		return;
+
+	/** UUID 는 수정 대상 X */
+	if (Comp->IsA(UUUIDBillboardComponent::StaticClass()))
 		return;
 
 	const char *TypeName = "SceneComponent";

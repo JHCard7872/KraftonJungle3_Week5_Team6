@@ -4,6 +4,7 @@
 #include <functional>
 class FEditorEngine;
 class UActorComponent;
+class AActor;
 class USceneComponent;
 using FPropertyChangedCallback = std::function<void(const FVector&, const FVector&, const FVector&)>;
 
@@ -32,6 +33,7 @@ private:
 	char    ActorNameBuf[128] = "None";
 	bool    bModified = false;
 
+	AActor* PrevSelectedActor = nullptr;
 	UActorComponent *SelectedComponent = nullptr;
 	UActorComponent *PendingRemove = nullptr;
 };
