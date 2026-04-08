@@ -20,6 +20,7 @@
 #include <random>
 #include <chrono>
 
+#include "Actor/CameraActor.h"
 #include "Actor/CubeActor.h"
 #include "Actor/PlaneActor.h"
 #include "Actor/SkySphereActor.h"
@@ -192,7 +193,7 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 		ImGui::SeparatorText("Spawn");
 
 		static int32 SpawnTypeIndex = 0;
-		const char* SpawnTypes[] = { "Cube", "Sphere", "Plane", "SubUV", "Text", "SkySphere", "Staticmesh" };
+		const char* SpawnTypes[] = { "Cube", "Sphere", "Plane", "SubUV", "Text", "SkySphere", "Staticmesh" , "Camera" };
 
 		ImGui::Combo("Type", &SpawnTypeIndex, SpawnTypes, IM_ARRAYSIZE(SpawnTypes));
 
@@ -247,6 +248,11 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 			else if (SpawnTypeIndex == 5)
 			{
 				NewActor = Level->SpawnActor<ASkySphereActor>(Name);
+			}
+			else if (SpawnTypeIndex == 7)
+			{
+				// Camera (index 7): PIE 시 이 액터의 시점으로 카메라가 전환된다.
+				NewActor = Level->SpawnActor<ACameraActor>(Name);
 			}
 			else
 			{
