@@ -112,6 +112,7 @@ private:
 	FEditorViewportClient* EditorViewportClientRaw = nullptr;
 
 	std::unique_ptr<FSlateApplication> SlateApplication = nullptr;
+	FViewportId LockedPIEViewportId = INVALID_VIEWPORT_ID;
 	bool bPIEJustCaptured = false;
 	bool bRequestEndPIE = false;
 };

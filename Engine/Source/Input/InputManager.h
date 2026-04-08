@@ -45,6 +45,9 @@ public:
 	float GetMouseDeltaX() const { return MouseDeltaX; }
 	float GetMouseDeltaY() const { return MouseDeltaY; }
 
+	/** 마우스 델타값을 강제로 0으로 초기화합니다. (위치 강제 이동 시 튐 방지용) */
+	void ResetMouseDelta() { MouseDeltaX = 0.0f; MouseDeltaY = 0.0f; }
+
 	static constexpr int32 MOUSE_LEFT = 0;
 	static constexpr int32 MOUSE_RIGHT = 1;
 	static constexpr int32 MOUSE_MIDDLE = 2;
@@ -67,5 +70,6 @@ private:
 	POINT LastMousePos = {};
 	bool bTrackingMouse = false;
 	bool bIsMouseCaptured = false;
+	bool bSkipDeltaOnce = false;
 	HWND TargetHwnd = nullptr;
 };

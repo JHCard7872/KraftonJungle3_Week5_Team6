@@ -59,6 +59,12 @@ void FEditorViewportInputService::TickCameraNavigation(
 	const float DeltaX = Input->GetMouseDeltaX();
 	const float DeltaY = Input->GetMouseDeltaY();
 
+	// [수정]: PIE 캡처가 일어난 직후 프레임에는 튐 방지를 위해 델타값을 무시한다.
+	if (EditorEngine->IsPIEJustCaptured())
+	{
+		return;
+	}
+
 	if (FocusedEntry->LocalState.ProjectionType == EViewportType::Perspective)
 	{
 		float Sensitivity = 0.2f;
@@ -229,11 +235,16 @@ void FEditorViewportInputService::HandleMessage(
 				{
 					if (Input)
 					{
-						EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지
+						EditorEngine->SetPIEJustCaptured(true); // 카메라 튐 방지 플래그 설정
 						Input->SetMouseCapture(true);
+						
 						POINT Center = { PIEViewport->GetRect().X + PIEViewport->GetRect().Width / 2, PIEViewport->GetRect().Y + PIEViewport->GetRect().Height / 2 };
 						::ClientToScreen(Engine->GetRenderer()->GetHwnd(), &Center);
 						::SetCursorPos(Center.x, Center.y);
+						
+						// [중요]: 위치 강제 이동 직후 델타값을 즉시 날려서 다음 프레임에서 거대한 이동량이 계산되지 않도록 함
+						Input->ResetMouseDelta();
+						
 						UE_LOG("[PIE] Re-captured (Possessed)");
 					}
 				}

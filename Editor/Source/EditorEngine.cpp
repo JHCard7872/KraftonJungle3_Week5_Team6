@@ -121,38 +121,61 @@ void FEditorEngine::StartPIE()
 	PIEWorld->SetWorldType(EWorldType::PIE);
 	
 	ActiveEditorWorldContext = PIEWorldContext;
+	LockedPIEViewportId = GetPIEViewportId();
 
 	// 4. 카메라 설정 우선순위 (사용자 배치 카메라 우선 탐색)
 	bool bPossessedCameraActor = false;
-	if (ULevel* PIELevel = PIEWorld->GetLevel())
-	{
-		ACameraActor* BestCamera = nullptr;
-		for (AActor* Actor : PIELevel->GetActors())
-		{
-			if (Actor && Actor->IsA(ACameraActor::StaticClass()))
-			{
-				ACameraActor* Candidate = static_cast<ACameraActor*>(Actor);
-				// "DefaultCameraActor"가 아닌 사용자가 배치한 카메라를 우선순위로 둠
-				if (Candidate->GetName().find("Default") == std::string::npos)
-				{
-					BestCamera = Candidate;
-					break; 
-				}
-				if (!BestCamera) BestCamera = Candidate;
-			}
-		}
+	ACameraActor* BestCamera = nullptr;
 
-		if (BestCamera)
+	// PIEWorld의 모든 액터를 순회하며 CameraActor를 찾음 (스트리밍 레벨 포함)
+	TArray<AActor*> AllPIEActors = PIEWorld->GetAllActors();
+	for (AActor* Actor : AllPIEActors)
+	{
+		if (Actor && Actor->IsA(ACameraActor::StaticClass()))
 		{
-			if (UCameraComponent* CameraComponent = BestCamera->GetCameraComponent())
+			ACameraActor* Candidate = static_cast<ACameraActor*>(Actor);
+			// "DefaultCameraActor"가 아닌 사용자가 배치한 카메라를 우선순위로 둠
+			if (Candidate->GetName().find("Default") == std::string::npos)
 			{
-				// 액터의 현재 트랜스폼을 카메라 컴포넌트에 반영
-				CameraComponent->ApplyComponentTransformToCamera();
-				PIEWorld->SetActiveCameraComponent(CameraComponent);
-				
-				UE_LOG("[PIE] Camera possession: %s", BestCamera->GetName().c_str());
-				bPossessedCameraActor = true;
+				BestCamera = Candidate;
+				break; 
 			}
+			if (!BestCamera) BestCamera = Candidate;
+		}
+	}
+
+	if (BestCamera)
+	{
+		if (UCameraComponent* CameraComponent = BestCamera->GetCameraComponent())
+		{
+			// 액터의 현재 트랜스폼을 카메라 컴포넌트에 반영
+			CameraComponent->ApplyComponentTransformToCamera();
+			
+			// 현재 PIE 뷰포트 종횡비 적용
+			if (CameraComponent->GetCamera())
+			{
+				CameraComponent->GetCamera()->SetAspectRatio(AspectRatio);
+			}
+
+			PIEWorld->SetActiveCameraComponent(CameraComponent);
+			
+			// [추가]: Possess한 카메라의 좌표를 에디터 뷰포트 상태에도 즉시 동기화 (Eject 시 튐 방지)
+			FCamera* BestCam = CameraComponent->GetCamera();
+			if (BestCam)
+			{
+				for (FViewportEntry& Entry : ViewportRegistry.GetEntries())
+				{
+					if (Entry.LocalState.ProjectionType == EViewportType::Perspective)
+					{
+						Entry.LocalState.Position = BestCam->GetPosition();
+						Entry.LocalState.Rotation.Yaw = BestCam->GetYaw();
+						Entry.LocalState.Rotation.Pitch = BestCam->GetPitch();
+					}
+				}
+			}
+
+			UE_LOG("[PIE] Camera possession: %s", BestCamera->GetName().c_str());
+			bPossessedCameraActor = true;
 		}
 	}
 
@@ -228,6 +251,7 @@ void FEditorEngine::EndPIE()
 	
 	// PIE 전용 클라이언트 객체 완전 제거
 	PIEViewportClient.reset();
+	LockedPIEViewportId = INVALID_VIEWPORT_ID;
 
 	// 5. 카메라 상태 복원
 	for (auto& Pair : EditorCameraStatesBackup)
@@ -350,6 +374,11 @@ FViewportId FEditorEngine::GetPIEViewportId() const
 	if (!IsPlayingInEditor())
 	{
 		return INVALID_VIEWPORT_ID;
+	}
+
+	if (LockedPIEViewportId != INVALID_VIEWPORT_ID)
+	{
+		return LockedPIEViewportId;
 	}
 
 	FSlateApplication* Slate = GetSlateApplication();
@@ -582,21 +611,16 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 			{
 				if (!Input->IsMouseCaptured())
 				{
-					// [Ejected 상태]: 에디터 조작계의 값들을 PIE 카메라에 투영
-					FViewportId FocusedId =
-						SlateApplication ? SlateApplication->GetFocusedViewportId() : INVALID_VIEWPORT_ID;
-					FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
-					if (!FocusedEntry && !ViewportRegistry.GetEntries().empty())
-					{
-						FocusedEntry = &ViewportRegistry.GetEntries().front();
-					}
+					// [Ejected 상태]: 오직 PIE 뷰포트의 좌표만 PIE 카메라에 투영
+					const FViewportId PIEId = GetPIEViewportId();
+					FViewportEntry* PIEEntry = ViewportRegistry.FindEntryByViewportID(PIEId);
 
-					if (FocusedEntry)
+					if (PIEEntry)
 					{
 						FCamera* Cam = PIECamComp->GetCamera();
-						Cam->SetPosition(FocusedEntry->LocalState.Position);
-						Cam->SetRotation(FocusedEntry->LocalState.Rotation.Yaw, FocusedEntry->LocalState.Rotation.Pitch);
-						PIECamComp->SetFov(FocusedEntry->LocalState.FovY);
+						Cam->SetPosition(PIEEntry->LocalState.Position);
+						Cam->SetRotation(PIEEntry->LocalState.Rotation.Yaw, PIEEntry->LocalState.Rotation.Pitch);
+						PIECamComp->SetFov(PIEEntry->LocalState.FovY);
 					}
 				}
 				else

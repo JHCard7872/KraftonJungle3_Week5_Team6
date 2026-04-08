@@ -208,7 +208,7 @@ void FControlPanelWindow::Render(FEditorEngine* Engine)
 
 		if (ImGui::Button("Spawn"))
 		{
-			ULevel* Level = Engine->GetLevel();
+			ULevel* Level = Engine->GetEditorLevel();
 			static int32 SpawnCount = 0;
 			const FString Name = FString(SpawnTypes[SpawnTypeIndex]) + "_Spawned_" + std::to_string(SpawnCount++);
 
