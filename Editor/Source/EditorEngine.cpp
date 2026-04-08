@@ -167,6 +167,8 @@ void FEditorEngine::EndPIE()
 
 	UE_LOG("[PIE] Play In Editor Stopped.");
 
+	bIsPaused = false; // ⭐ 종료 시 일시정지 해제
+
 	// 마우스 캡처 해제
 	if (FInputManager* Input = GetInputManager())
 	{
@@ -408,6 +410,16 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 			}
 		}
 		bF8WasDown = bF8IsDown;
+
+		// P: Pause/Resume 토글
+		static bool bPWasDown = false;
+		bool bPIsDown = (::GetAsyncKeyState('P') & 0x8000) != 0;
+		if (bPIsDown && !bPWasDown)
+		{
+			bIsPaused = !bIsPaused;
+			UE_LOG("[PIE] %s", bIsPaused ? "Paused" : "Resumed");
+		}
+		bPWasDown = bPIsDown;
 	}
 
 	SyncViewportClient();
@@ -425,7 +437,10 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 		}
 
 		// PIE 중 우클릭 + WASD/마우스로 카메라 이동
-		TickPIECamera(DeltaTime);
+		if (!bIsPaused)
+		{
+			TickPIECamera(DeltaTime);
+		}
 	}
 }
 
@@ -433,6 +448,12 @@ void FEditorEngine::TickWorlds(float DeltaTime)
 {
 	if (UWorld* ActiveWorld = GetActiveWorld())
 	{
+		// PIE 중이고 일시정지 상태라면 틱을 건너뜀 (단, 에디터 월드 등은 영향을 받지 않도록 함)
+		if (IsPlayingInEditor() && bIsPaused && ActiveWorld->GetWorldType() == EWorldType::PIE)
+		{
+			return;
+		}
+
 		ActiveWorld->Tick(DeltaTime);
 	}
 }

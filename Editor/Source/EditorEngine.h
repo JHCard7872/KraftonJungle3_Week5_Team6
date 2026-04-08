@@ -22,6 +22,8 @@ public:
 	void StartPIE();
 	void EndPIE();
 	bool IsPlayingInEditor() const { return PIEWorldContext != nullptr; }
+	bool IsPaused() const { return bIsPaused; }
+	void SetPaused(bool bInPaused) { bIsPaused = bInPaused; }
 
 	void Shutdown() override;
 	void SetSelectedActor(AActor* InActor);
@@ -104,4 +106,6 @@ private:
 	FEditorViewportClient* EditorViewportClientRaw = nullptr;
 
 	std::unique_ptr<FSlateApplication> SlateApplication = nullptr;
+
+	bool bIsPaused = false;
 };
