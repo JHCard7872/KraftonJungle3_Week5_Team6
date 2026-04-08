@@ -161,16 +161,20 @@ void FEditorViewportInputService::HandleMessage(
 		const ImGuiIO& IO = ImGui::GetIO();
 		if (IO.WantCaptureMouse)
 		{
-			if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
+			// PIE 모드 중 실제 뷰포트 영역 안을 클릭/우클릭하는 경우는 제외함 (조작권 보장)
+			if (!EditorEngine->IsPlayingInEditor() || !Slate->GetIsCoursorInArea())
 			{
-				// 뷰포트 포커스를 명시적으로 해제 (파란 테두리 제거)
-				Slate->ClearFocus();
-				return;
-			}
-			
-			if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
-			{
-				return;
+				if (Msg == WM_LBUTTONDOWN || Msg == WM_RBUTTONDOWN || Msg == WM_MBUTTONDOWN)
+				{
+					// 뷰포트 포커스를 명시적으로 해제 (파란 테두리 제거)
+					Slate->ClearFocus();
+					return;
+				}
+				
+				if (Msg == WM_LBUTTONUP || Msg == WM_RBUTTONUP || Msg == WM_MBUTTONUP || Msg == WM_MOUSEMOVE)
+				{
+					return;
+				}
 			}
 		}
 	}
