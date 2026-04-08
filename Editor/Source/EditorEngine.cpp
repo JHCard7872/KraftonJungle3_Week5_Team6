@@ -11,7 +11,6 @@
 #include "Core/Engine.h"
 #include "Input/InputManager.h"
 #include "Debug/EngineLog.h"
-#include "Input/InputManager.h"
 #include "Asset/ObjManager.h"
 #include "Core/Paths.h"
 #include "Object/ObjectFactory.h"
@@ -22,6 +21,7 @@
 #include "Viewport/PreviewViewportClient.h"
 #include "World/World.h"
 #include "Slate/EditorViewportOverlay.h"
+#include "Pawn/EditorCameraPawn.h"
 
 namespace
 {
@@ -49,16 +49,6 @@ namespace
 		UWorld* PreviewWorld = PreviewContext->World;
 		if (PreviewWorld->GetActors().empty())
 		{
-			/*AActor* PreviewActor = PreviewWorld->SpawnActor<AActor>("PreviewCube");
-			if (PreviewActor)
-			{
-				UStaticMeshComponent* PreviewComponent = FObjectFactory::ConstructObject<UStaticMeshComponent>(PreviewActor);
-				PreviewActor->AddOwnedComponent(PreviewComponent);
-				PreviewActor->SetRootComponent(PreviewComponent);
-
-				PreviewComponent->SetStaticMesh(FObjManager::GetPrimitiveCube());
-				PreviewActor->SetActorLocation({ 0.0f, 0.0f, 0.0f });
-			}*/
 		}
 
 		if (UCameraComponent* PreviewCamera = PreviewWorld->GetActiveCameraComponent())
@@ -76,7 +66,7 @@ void FEditorEngine::StartPIE()
 {
 	if (IsPlayingInEditor() || !EditorWorldContext || !EditorWorldContext->World) return;
 
-	UE_LOG("[PIE] Play In Editor Started. Click Viewport to capture mouse.");
+	UE_LOG("[PIE] Play In Editor Started.");
 
 	// 1. 에디터 카메라 상태 백업
 	EditorCameraStatesBackup.clear();
@@ -96,7 +86,16 @@ void FEditorEngine::StartPIE()
 		EditorCamPitch = EditorCam->GetCamera()->GetPitch();
 	}
 
-	// PIE 진입 전 에디터 선택 해제
+	// 3. 에디터 폰(EditorPawn) 좌표 PIE 시작 전 즉시 동기화 (첫 F8 점프 방지)
+	if (AEditorCameraPawn* EditorPawn = CameraSubsystem.GetEditorCameraPawn())
+	{
+		EditorPawn->SetActorLocation(EditorCamPos);
+		if (UCameraComponent* EditorCamComp = EditorPawn->GetCameraComponent())
+		{
+			EditorCamComp->GetCamera()->SetRotation(EditorCamYaw, EditorCamPitch);
+		}
+	}
+
 	SetSelectedActor(nullptr);
 
 	FDuplicateionContext Context;
@@ -119,7 +118,7 @@ void FEditorEngine::StartPIE()
 	PIEWorld->SetWorldType(EWorldType::PIE);
 	ActiveEditorWorldContext = PIEWorldContext;
 
-	// 3. 카메라 설정 우선순위
+	// 4. 카메라 설정 우선순위
 	bool bPossessedCameraActor = false;
 	if (ULevel* PIELevel = PIEWorld->GetLevel())
 	{
@@ -139,7 +138,6 @@ void FEditorEngine::StartPIE()
 		}
 	}
 
-	// 배치된 카메라 액터가 없는 경우에만 에디터 카메라 위치를 복제본에 적용
 	if (!bPossessedCameraActor)
 	{
 		if (UCameraComponent* PIECam = PIEWorld->GetActiveCameraComponent())
@@ -152,7 +150,6 @@ void FEditorEngine::StartPIE()
 	PIEWorld->BeginPlay();
 	SyncViewportClient();
 
-	// 시작 시 즉시 마우스 캡처(Possessed) 상태로 진입
 	if (FInputManager* Input = GetInputManager())
 	{
 		Input->SetMouseCapture(true);
@@ -165,7 +162,6 @@ void FEditorEngine::EndPIE()
 
 	UE_LOG("[PIE] Play In Editor Stopped.");
 
-	// 마우스 캡처 해제
 	if (FInputManager* Input = GetInputManager())
 	{
 		Input->SetMouseCapture(false);
@@ -183,7 +179,6 @@ void FEditorEngine::EndPIE()
 	SetViewportClient(nullptr);
 	PIEViewportClient.reset();
 
-	// PIE 종료 시 에디터 카메라 상태 복구
 	for (auto& Pair : EditorCameraStatesBackup)
 	{
 		if (FViewportEntry* Entry = ViewportRegistry.FindEntryByViewportID(Pair.first))
@@ -386,15 +381,15 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 			EndPIE();
 		}
 
-		// F8: Possess/Eject 토글
 		static bool bF8WasDown = false;
 		bool bF8IsDown = (::GetAsyncKeyState(VK_F8) & 0x8000) != 0;
 		if (bF8IsDown && !bF8WasDown)
 		{
 			if (FInputManager* Input = GetInputManager())
 			{
-				Input->SetMouseCapture(!Input->IsMouseCaptured());
-				UE_LOG("[PIE] %s", Input->IsMouseCaptured() ? "Possessed" : "Ejected");
+				bool bWillCapture = !Input->IsMouseCaptured();
+				Input->SetMouseCapture(bWillCapture);
+				UE_LOG("[PIE] %s", bWillCapture ? "Possessed" : "Ejected");
 			}
 		}
 		bF8WasDown = bF8IsDown;
@@ -402,6 +397,54 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 
 	SyncViewportClient();
 	SyncFocusedViewportLocalState();
+
+	// [Possessed 상태 시점 보존 핵심]: CameraSubsystem 업데이트 전에 PIE 카메라 정보를 에디터 시스템에 실시간 주입
+	if (IsPlayingInEditor())
+	{
+		FInputManager* Input = GetInputManager();
+		UWorld* PIEWorld = PIEWorldContext ? PIEWorldContext->World : nullptr;
+		UCameraComponent* PIECamComp = PIEWorld ? PIEWorld->GetActiveCameraComponent() : nullptr;
+		
+		if (Input && Input->IsMouseCaptured() && PIECamComp && SlateApplication)
+		{
+			FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
+			FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
+			if (FocusedEntry && PIECamComp->GetCamera())
+			{
+				FCamera* Cam = PIECamComp->GetCamera();
+				
+				// 1. 데이터 저장
+				FocusedEntry->LocalState.Position = Cam->GetPosition();
+				FocusedEntry->LocalState.Rotation.Yaw = Cam->GetYaw();
+				FocusedEntry->LocalState.Rotation.Pitch = Cam->GetPitch();
+				FocusedEntry->LocalState.FovY = Cam->GetFOV();
+
+				// 2. 에디터 컨트롤러 내부 좌표 강제 업데이트
+				if (FEditorViewportController* Controller = CameraSubsystem.GetViewportController())
+				{
+					if (FViewportLocalState* ActiveState = Controller->GetActiveLocalState())
+					{
+						ActiveState->Position = Cam->GetPosition();
+						ActiveState->Rotation.Yaw = Cam->GetYaw();
+						ActiveState->Rotation.Pitch = Cam->GetPitch();
+						ActiveState->FovY = Cam->GetFOV();
+					}
+				}
+
+				// 3. 에디터 폰 업데이트 (점프 방지용 핵심)
+				if (AEditorCameraPawn* EditorPawn = CameraSubsystem.GetEditorCameraPawn())
+				{
+					EditorPawn->SetActorLocation(Cam->GetPosition());
+					if (UCameraComponent* EditorCamComp = EditorPawn->GetCameraComponent())
+					{
+						EditorCamComp->GetCamera()->SetRotation(Cam->GetYaw(), Cam->GetPitch());
+						EditorCamComp->SetFov(Cam->GetFOV());
+					}
+				}
+			}
+		}
+	}
+
 	CameraSubsystem.PrepareFrame(GetActiveWorld(), GetLevel(), DeltaTime);
 
 	if (IsPlayingInEditor())
@@ -414,7 +457,6 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 		{
 			if (!Input->IsMouseCaptured())
 			{
-				// [Ejected 상태]: 에디터 조작계(LocalState)의 값들을 PIE 카메라에 매 프레임 강제 투영
 				if (SlateApplication)
 				{
 					FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
@@ -432,26 +474,7 @@ void FEditorEngine::PrepareFrame(float DeltaTime)
 			}
 			else
 			{
-				// [Possessed 상태]: PIE 월드 전용 FPS 조작(WASD+마우스) 수행
 				TickPIECamera(DeltaTime);
-
-				// 시점 역동기화: 현재 조작 중인 PIE 카메라 데이터를 LocalState에 실시간 저장
-				// 이 로직 덕분에 F8을 누르는 순간 시점 점프 없이 그 자리에서 마우스만 나타남
-				if (SlateApplication)
-				{
-					FViewportId FocusedId = SlateApplication->GetFocusedViewportId();
-					FViewportEntry* FocusedEntry = ViewportRegistry.FindEntryByViewportID(FocusedId);
-					if (FocusedEntry)
-					{
-						if (FCamera* Cam = PIECamComp->GetCamera())
-						{
-							FocusedEntry->LocalState.Position = Cam->GetPosition();
-							FocusedEntry->LocalState.Rotation.Yaw = Cam->GetYaw();
-							FocusedEntry->LocalState.Rotation.Pitch = Cam->GetPitch();
-							FocusedEntry->LocalState.FovY = Cam->GetFOV();
-						}
-					}
-				}
 			}
 		}
 	}
@@ -486,7 +509,6 @@ void FEditorEngine::RenderFrame()
 
 	if (IsPlayingInEditor() && PIEViewportClient && EditorViewportClientRaw)
 	{
-		// 1) 에디터 UI 및 기본 레이아웃 렌더링 (Ejected 상태라면 ActiveClient가 이미 Editor이므로 중복 호출 방지)
 		if (ActiveClient != EditorViewportClientRaw)
 		{
 			EditorViewportClientRaw->Render(this, Renderer);
@@ -498,7 +520,6 @@ void FEditorEngine::RenderFrame()
 			return;
 		}
 
-		// 2) 게임 씬 렌더링 (Possessed 상태라면 ActiveClient가 PIE이므로 여기서 직접 패널 영역에 그림)
 		if (ActiveClient == PIEViewportClient.get())
 		{
 			FSlateApplication* Slate = SlateApplication.get();
@@ -540,7 +561,6 @@ void FEditorEngine::RenderFrame()
 				}
 			}
 			
-			// 렌더링 완료 후 리턴 (ActiveClient->Render() 중복 호출 방지)
 			Renderer->EndFrame();
 			return;
 		}
@@ -548,7 +568,6 @@ void FEditorEngine::RenderFrame()
 	
 	if (ActiveClient)
 	{
-		// 일반 에디터 모드이거나, PIE Ejected 상태일 때는 여기서 최종 렌더링 수행
 		ActiveClient->Render(this, Renderer);
 	}
 
@@ -819,16 +838,13 @@ void FEditorEngine::SyncViewportClient()
 	}
 	else if (ActiveLevelContext && ActiveLevelContext->WorldType == EWorldType::PIE)
 	{
-		// PIE 모드: 캡처 상태에 따라 조작 주체를 바꿉니다.
 		FInputManager* Input = GetInputManager();
 		if (Input && !Input->IsMouseCaptured())
 		{
-			// Ejected: 에디터 클라이언트를 사용하여 버튼 클릭, 기즈모 조작 가능
 			TargetViewportClient = EditorViewportClientRaw;
 		}
 		else
 		{
-			// Possessed: 게임 클라이언트를 사용하여 순수 게임 화면 처리
 			if (!PIEViewportClient)
 			{
 				PIEViewportClient = std::make_unique<FGameViewportClient>();
@@ -865,12 +881,9 @@ void FEditorEngine::TickPIECamera(float DeltaTime)
 	bool bRightMouseDown = Input->IsMouseButtonDown(FInputManager::MOUSE_RIGHT);
 	bool bInArea = SlateApplication ? SlateApplication->GetIsCoursorInArea() : false;
 
-	// [Ejected 상태 조건]: 반드시 뷰포트 영역 내부에 마우스가 있고 우클릭 중이어야 함
 	if (!bIsCaptured)
 	{
 		if (!bInArea || !bRightMouseDown) return;
-		
-		// ImGui 패널 조작 중이면 차단 (우클릭 중이 아닐 때만)
 		if (ImGui::GetCurrentContext() && !bRightMouseDown && ImGui::GetIO().WantCaptureMouse) return;
 	}
 
