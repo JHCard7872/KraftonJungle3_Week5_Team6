@@ -137,6 +137,13 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 	if (Engine)
 	{
 		AActor* SelectedActor = Engine->GetSelectedActor();
+
+		if (PrevSelectedActor != SelectedActor)
+		{
+			SelectedComponent = nullptr;
+			PrevSelectedActor = SelectedActor;
+		}
+
 		if (SelectedActor)
 		{
 			if (ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen))

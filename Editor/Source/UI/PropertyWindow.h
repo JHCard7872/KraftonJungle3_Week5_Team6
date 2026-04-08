@@ -4,6 +4,7 @@
 #include <functional>
 class FEditorEngine;
 class UActorComponent;
+class AActor;
 using FPropertyChangedCallback = std::function<void(const FVector&, const FVector&, const FVector&)>;
 
 class FPropertyWindow
@@ -31,4 +32,5 @@ private:
 	bool    bModified = false;
 
 	UActorComponent* SelectedComponent = nullptr;
+	AActor* PrevSelectedActor = nullptr;
 };
