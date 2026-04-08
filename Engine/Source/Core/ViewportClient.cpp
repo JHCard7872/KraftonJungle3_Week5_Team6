@@ -43,7 +43,17 @@ UWorld* IViewportClient::ResolveWorld(FEngine* Engine) const
 
 void IViewportClient::BuildRenderCommands(FEngine* Engine, ULevel* Level, const FFrustum& Frustum, const FShowFlags& Flags, const FVector& CameraPosition, FRenderCommandQueue& OutQueue)
 {
-	UWorld* World = ResolveWorld(Engine);
+	UWorld* World = nullptr;
+	if (Level)
+	{
+		World = Level->GetTypedOuter<UWorld>();
+	}
+
+	if (!World)
+	{
+		World = ResolveWorld(Engine);
+	}
+
 	if (!World) return;
 
 	// Persistent + Streaming 전체 액터를 렌더

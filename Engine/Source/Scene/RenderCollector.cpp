@@ -2,6 +2,7 @@
 #include "Component/UUIDBillboardComponent.h"
 #include "Renderer/RenderCommand.h"
 #include "Actor/Actor.h"
+#include "Actor/CameraActor.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/SubUVComponent.h"
 #include "Core/Engine.h"
@@ -28,6 +29,10 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 
 	FTextMeshBuilder& TextRenderer = Renderer->GetTextRenderer();
 	FSubUVRenderer& SubUVRenderer = Renderer->GetSubUVRenderer();
+
+	const FMatrix ViewInverse = OutQueue.ViewMatrix.GetInverse();
+	const FVector CameraForward = ViewInverse.GetForwardVector();
+	const bool bIsOrthographic = std::abs(OutQueue.ProjectionMatrix[3][3] - 1.0f) < 0.0001f;
 
 	for (UPrimitiveComponent* Comp : VisiblePrimitives)
 	{
@@ -78,7 +83,14 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 
 						if (TextComp->IsBillboard())
 						{
-							Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+							if (bIsOrthographic)
+							{
+								Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboardFromForward(WorldPos, CameraForward);
+							}
+							else
+							{
+								Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+							}
 						}
 						else
 						{
@@ -122,7 +134,14 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 					{
 						const FVector WorldPos = Command.WorldMatrix.GetTranslation();
 						const FVector Scale = Command.WorldMatrix.GetScaleVector();
-						Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+						if (bIsOrthographic)
+						{
+							Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboardFromForward(WorldPos, CameraForward);
+						}
+						else
+						{
+							Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+						}
 					}
 
 					OutQueue.AddCommand(Command);
@@ -210,7 +229,14 @@ void FLevelRenderCollector::CollectRenderCommands(const TArray<AActor*>& Actors,
 					{
 						const FVector WorldPos = Command.WorldMatrix.GetTranslation();
 						const FVector Scale = Command.WorldMatrix.GetScaleVector();
-						Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+						if (bIsOrthographic)
+						{
+							Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboardFromForward(WorldPos, CameraForward);
+						}
+						else
+						{
+							Command.WorldMatrix = FMatrix::MakeScale(Scale) * FMatrix::MakeBillboard(WorldPos, CameraPosition);
+						}
 					}
 					OutQueue.AddCommand(Command);
 				}
@@ -242,6 +268,15 @@ void FLevelRenderCollector::FrustrumCull(const TArray<AActor*>& Actors, const FF
 			if (bIsUUID)
 			{
 				if (!ShowFlags.HasFlag(EEngineShowFlags::SF_UUID)) continue;
+
+				// [수정]: PIE 중에는 카메라 액터의 UUID만 특별히 숨긴다.
+				if (Actor->GetWorld()->GetWorldType() == EWorldType::PIE)
+				{
+					if (Actor->IsA(ACameraActor::StaticClass()))
+					{
+						continue;
+					}
+				}
 			}
 			else if (bIsCameraArrow)
 			{

@@ -92,11 +92,24 @@ void FInputManager::Tick()
 			int32 CenterY = (Rect.top + Rect.bottom) / 2;
 
 			POINT CurrentPos;
-			GetCursorPos(&CurrentPos);
-			MouseDeltaX = static_cast<float>(CurrentPos.x - CenterX);
-			MouseDeltaY = static_cast<float>(CurrentPos.y - CenterY);
-
-			SetCursorPos(CenterX, CenterY);
+			if (GetCursorPos(&CurrentPos))
+			{
+				if (bSkipDeltaOnce)
+				{
+					// [중요]: 캡처 직후 첫 프레임은 클릭 지점에서 중앙으로 날아온 거리를 무시한다.
+					MouseDeltaX = 0.0f;
+					MouseDeltaY = 0.0f;
+					bSkipDeltaOnce = false;
+				}
+				else
+				{
+					MouseDeltaX = static_cast<float>(CurrentPos.x - CenterX);
+					MouseDeltaY = static_cast<float>(CurrentPos.y - CenterY);
+				}
+				
+				// 항상 다시 중앙으로 돌려놓음
+				SetCursorPos(CenterX, CenterY);
+			}
 		}
 	}
 	else if (bTrackingMouse)
@@ -119,6 +132,12 @@ void FInputManager::SetMouseCapture(bool bInCapture)
 	if (bIsMouseCaptured == bInCapture) return;
 
 	bIsMouseCaptured = bInCapture;
+	
+	// 캡처 상태가 바뀔 때 델타값 초기화 (카메라 튀는 현상 방지)
+	MouseDeltaX = 0.0f;
+	MouseDeltaY = 0.0f;
+	bSkipDeltaOnce = true;
+
 	if (bIsMouseCaptured)
 	{
 		ShowCursor(FALSE);
@@ -126,7 +145,13 @@ void FInputManager::SetMouseCapture(bool bInCapture)
 		{
 			RECT Rect;
 			GetWindowRect(TargetHwnd, &Rect);
-			SetCursorPos((Rect.left + Rect.right) / 2, (Rect.top + Rect.bottom) / 2);
+			int32 CenterX = (Rect.left + Rect.right) / 2;
+			int32 CenterY = (Rect.top + Rect.bottom) / 2;
+			SetCursorPos(CenterX, CenterY);
+			
+			// 다음 Tick에서 델타 계산 시 기준점이 되도록 저장
+			LastMousePos.x = CenterX;
+			LastMousePos.y = CenterY;
 		}
 	}
 	else
