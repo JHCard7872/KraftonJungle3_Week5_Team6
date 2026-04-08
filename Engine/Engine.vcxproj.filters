@@ -314,6 +314,7 @@
       <Filter>Source\Actor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Actor\CameraActor.cpp" />
+    <ClCompile Include="Source\Renderer\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\CoreMinimal.h">
@@ -901,6 +902,7 @@
       <Filter>Source\Actor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Actor\CameraActor.h" />
+    <ClInclude Include="Source\Renderer\Texture.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

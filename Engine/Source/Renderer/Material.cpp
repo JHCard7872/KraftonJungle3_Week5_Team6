@@ -1,6 +1,7 @@
 #include "Material.h"
 #include "Shader.h"
 #include "MaterialManager.h"
+#include "Object/Class.h"
 #include <cstring>
 
 
@@ -278,4 +279,28 @@ void FMaterial::Release()
 		CB.Release();
 	}
 	ConstantBuffers.clear();
+}
+
+IMPLEMENT_RTTI(UMaterial, UObject);
+
+void UMaterial::PostConstruct()
+{
+	UObject::PostConstruct();
+}
+
+void UMaterial::SetDiffuse(FMaterialTexture* InTex)
+{
+}
+
+void UMaterial::SetDiffuse(UTexture* InTex)
+{
+}
+
+FMaterial* UMaterial::GetRenderMaterial()
+{
+	return nullptr;
+}
+
+void UMaterial::UpdateMaterial()
+{
 }
