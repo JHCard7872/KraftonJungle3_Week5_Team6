@@ -24,9 +24,3 @@ FBoxSphereBounds UCameraArrowComponent::GetWorldBounds() const
 	return { Center, Extent.Size(), Extent };
 }
 
-void UCameraArrowComponent::CopyPropertiesFrom(const UObject* Source)
-{
-	UPrimitiveComponent::CopyPropertiesFrom(Source);
-	const UCameraArrowComponent* Src = static_cast<const UCameraArrowComponent*>(Source);
-	this->ArrowMesh = Src->ArrowMesh;
-}

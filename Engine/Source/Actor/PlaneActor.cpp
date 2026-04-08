@@ -30,11 +30,3 @@ void APlaneActor::FixupReferences(const FDuplicateionContext& Context)
 		this->PlaneMeshComponent = static_cast<UStaticMeshComponent*>(Context.GetMappedObject(this->PlaneMeshComponent));
 	}
 }
-
-void APlaneActor::CopyPropertiesFrom(const UObject* Source)
-{
-	AActor::CopyPropertiesFrom(Source);
-	const APlaneActor* SourceActor = static_cast<const APlaneActor*>(Source);
-
-	this->PlaneMeshComponent = SourceActor->PlaneMeshComponent;
-}

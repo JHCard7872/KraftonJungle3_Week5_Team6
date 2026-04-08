@@ -19,6 +19,7 @@ public:
 	void PrepareFrame(UWorld* ActiveWorld, ULevel* ActiveLevel, float DeltaTime);
 
 	FEditorViewportController* GetViewportController();
+	AEditorCameraPawn* GetEditorCameraPawn() const { return EditorPawn; }
 
 private:
 	void SyncActiveCamera(UWorld* ActiveWorld, ULevel* ActiveLevel);

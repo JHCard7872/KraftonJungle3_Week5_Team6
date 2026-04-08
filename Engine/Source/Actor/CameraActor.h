@@ -15,14 +15,12 @@ class ENGINE_API ACameraActor : public AActor
 {
 public:
 	DECLARE_RTTI(ACameraActor, AActor)
+	GENERATE_SHALLOW_CLONE(ACameraActor)
 
 	UCameraComponent* GetCameraComponent() const { return CameraComponent; }
 
 	void PostSpawnInitialize() override;
 	void FixupReferences(const FDuplicateionContext& Context) override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	UCameraComponent* CameraComponent = nullptr;

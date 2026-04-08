@@ -82,20 +82,22 @@ void FInputManager::Tick()
 	}
 	EventQueue.clear();
 
-	// Mouse delta
+	// Mouse delta calculation
 	if (bIsMouseCaptured && TargetHwnd)
 	{
 		RECT Rect;
-		GetWindowRect(TargetHwnd, &Rect);
-		int32 CenterX = (Rect.left + Rect.right) / 2;
-		int32 CenterY = (Rect.top + Rect.bottom) / 2;
+		if (GetWindowRect(TargetHwnd, &Rect))
+		{
+			int32 CenterX = (Rect.left + Rect.right) / 2;
+			int32 CenterY = (Rect.top + Rect.bottom) / 2;
 
-		POINT CurrentPos;
-		GetCursorPos(&CurrentPos);
-		MouseDeltaX = static_cast<float>(CurrentPos.x - CenterX);
-		MouseDeltaY = static_cast<float>(CurrentPos.y - CenterY);
+			POINT CurrentPos;
+			GetCursorPos(&CurrentPos);
+			MouseDeltaX = static_cast<float>(CurrentPos.x - CenterX);
+			MouseDeltaY = static_cast<float>(CurrentPos.y - CenterY);
 
-		SetCursorPos(CenterX, CenterY);
+			SetCursorPos(CenterX, CenterY);
+		}
 	}
 	else if (bTrackingMouse)
 	{

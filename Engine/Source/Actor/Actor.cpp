@@ -98,6 +98,10 @@ void AActor::PostSpawnInitialize()
 		{
 			AddOwnedComponent(UUIDComponent);
 
+			if (RootComponent && RootComponent != UUIDComponent)
+			{
+				UUIDComponent->AttachTo(RootComponent);
+			}
 			UUIDComponent->SetWorldOffset(FVector(0.0f, 0.0f, 0.3f));
 			UUIDComponent->SetWorldScale(0.3f);
 			UUIDComponent->SetTextColor(FVector4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -323,36 +327,32 @@ void AActor::SetActorLocation(const FVector& InLocation)
 
 	RootComponent->SetRelativeLocation(InLocation);
 }
-
 void AActor::FixupReferences(const FDuplicateionContext& Context)
 {
 	UObject::FixupReferences(Context);
 
 	if (RootComponent)
 	{
-		RootComponent = static_cast<USceneComponent*>(Context.GetMappedObject(RootComponent));
+		// 원본 RootComponent에 대응하는 복제본으로 정확히 매핑
+		USceneComponent* MappedRoot = static_cast<USceneComponent*>(Context.GetMappedObject(RootComponent));
+		if (MappedRoot)
+		{
+			RootComponent = MappedRoot;
+		}
 	}
 }
 
-void AActor::CopyPropertiesFrom(const UObject* Source)
-{
-	UObject::CopyPropertiesFrom(Source);
-	const AActor* SourceActor = static_cast<const AActor*>(Source);
-
-	this->bCanEverTick = SourceActor->bCanEverTick;
-	this->bTickEnabled = SourceActor->bTickEnabled;
-	this->bVisible = SourceActor->bVisible;
-
-	this->RootComponent = SourceActor->RootComponent;
-	this->OwnedComponents = SourceActor->OwnedComponents;
-}
 
 void AActor::DuplicateSubObjects(FDuplicateionContext& Context)
 {
 	UObject::DuplicateSubObjects(Context);
 
+	// 복제 전 원본의 RootComponent 포인터를 기억함 (현재 this는 Clone된 상태라 에디터 객체를 가리키고 있음)
+	USceneComponent* OldRoot = this->RootComponent;
+
 	TArray<UActorComponent*> OldComponents = this->OwnedComponents;
 	this->OwnedComponents.clear();
+
 
 	for (UActorComponent* OldComp : OldComponents)
 	{
@@ -360,6 +360,16 @@ void AActor::DuplicateSubObjects(FDuplicateionContext& Context)
 		{
 			UActorComponent* NewComp = static_cast<UActorComponent*>(OldComp->Duplicate(Context, this));
 			this->AddOwnedComponent(NewComp);
+		}
+	}
+
+	// AddOwnedComponent가 임의로 잡은 루트 대신, 원본과 매칭되는 루트를 강제 설정
+	if (OldRoot)
+	{
+		USceneComponent* NewRoot = static_cast<USceneComponent*>(Context.GetMappedObject(OldRoot));
+		if (NewRoot)
+		{
+			this->RootComponent = NewRoot;
 		}
 	}
 }

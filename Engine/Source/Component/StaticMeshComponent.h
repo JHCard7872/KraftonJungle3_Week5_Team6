@@ -10,6 +10,7 @@ class ENGINE_API UStaticMeshComponent : public UMeshComponent
 {
 public:
 	DECLARE_RTTI(UStaticMeshComponent, UMeshComponent)
+	GENERATE_SHALLOW_CLONE(UStaticMeshComponent);
 
 	void SetStaticMesh(UStaticMesh* InStaticMesh);
 	FRenderMesh* GetRenderMesh() const override;
@@ -21,9 +22,6 @@ public:
 	void Serialize(FArchive& Ar) override;
 	FBoxSphereBounds CalcBounds(const FMatrix& LocalToWorld) const override;
 	FBoxSphereBounds GetLocalBounds() const override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	UStaticMesh* StaticMesh = nullptr;

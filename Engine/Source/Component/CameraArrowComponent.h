@@ -12,6 +12,7 @@ class ENGINE_API UCameraArrowComponent : public UPrimitiveComponent
 {
 public:
 	DECLARE_RTTI(UCameraArrowComponent, UPrimitiveComponent)
+	GENERATE_SHALLOW_CLONE(UCameraArrowComponent);
 
 	void PostConstruct() override;
 
@@ -20,9 +21,6 @@ public:
 
 	FRenderMesh* GetRenderMesh() const override;
 	FBoxSphereBounds GetWorldBounds() const override;
-
-protected:
-	void CopyPropertiesFrom(const UObject* Source) override;
 
 private:
 	std::shared_ptr<FDynamicMesh> ArrowMesh;

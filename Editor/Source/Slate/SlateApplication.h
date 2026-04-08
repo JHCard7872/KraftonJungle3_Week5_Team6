@@ -13,10 +13,13 @@ class FSlateApplication
 	FViewportId HoveredViewportId = INVALID_VIEWPORT_ID;
 	FViewportId FocusedViewportId = INVALID_VIEWPORT_ID;
 	FViewportId MouseCapturedViewportId = INVALID_VIEWPORT_ID;
-	SSplitter*  DraggingSplitter = nullptr;
-	bool bViewportMaximized = false;
-	EViewportLayout LayoutBeforeMaximize = EViewportLayout::FourGrid;
 	FViewportId MaximizedViewportId = INVALID_VIEWPORT_ID;
+	EViewportLayout LayoutBeforeMaximize = EViewportLayout::FourGrid;
+
+	SSplitter*  DraggingSplitter = nullptr;
+
+	bool bViewportMaximized = false;
+
 	int32 SwappedViewportIndex = -1;
 	float SavedSplitterRatios[3] = { 0.5f, 0.5f, 0.5f };
 
@@ -74,7 +77,7 @@ public:
 	void AddOverlayWidget(SWidget* W) { OverlayWidgets.push_back(W); }
 	void Paint(SWidget& Painter);
 
-	void ProcessMouseDown(int32 X, int32 Y);
+	bool ProcessMouseDown(int32 X, int32 Y);
 	void ProcessMouseDoubleClick(int32 X, int32 Y);
 	void ProcessMouseMove(int32 X, int32 Y);
 	void ProcessMouseUp(int32 X, int32 Y);

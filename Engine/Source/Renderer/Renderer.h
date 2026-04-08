@@ -67,6 +67,8 @@ public:
 	/** 렌더 타깃을 다시 스왑체인 백버퍼로 바인딩한다. */
 	void BindSwapChainRTV();
 
+	virtual void SetRenderViewport(float X, float Y, float Width, float Height, float MinDepth = 0.0f, float MaxDepth = 1.0f);
+
 	void SetVSync(bool bEnable) { bVSyncEnabled = bEnable; }
 	bool IsVSyncEnabled() const { return bVSyncEnabled; }
 

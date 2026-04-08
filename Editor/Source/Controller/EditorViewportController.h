@@ -18,6 +18,7 @@ public:
 	void Cleanup();
 	void SetFrameDeltaTime(float DeltaTime);
 	void SetActiveLocalState(FViewportLocalState* InLocalState);
+	FViewportLocalState* GetActiveLocalState() const { return ActiveLocalState; }
 
 private:
 	void SetupInputBindings();
