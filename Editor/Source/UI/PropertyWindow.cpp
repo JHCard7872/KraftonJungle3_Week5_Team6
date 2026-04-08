@@ -151,13 +151,13 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 			{
 				ImGui::Indent(8.0f);
 
-				// ─── 컴포넌트 목록 ───
+				// â”€â”€â”€ ì»´í¬ë„ŒíŠ¸ ëª©ë¡ â”€â”€â”€
 				PendingRemove = nullptr;
 
 				 if (USceneComponent *Root = SelectedActor->GetRootComponent())
 					DrawComponentTree(Root, 0);
 
-				// 루프 밖에서 삭제
+				// ë£¨í”„ ë°–ì—ì„œ ì‚­ì œ
 				if (PendingRemove)
 				{
 					if (SelectedComponent == PendingRemove)
@@ -170,7 +170,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 
 				ImGui::Separator();
 
-				// ─── 컴포넌트 추가 ───
+				// â”€â”€â”€ ì»´í¬ë„ŒíŠ¸ ì¶”ê°€ â”€â”€â”€
 				const char* AddableComponents[] = {
 					"StaticMeshComponent",
 					"BillboardComponent",
@@ -185,7 +185,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 
 				if (ImGui::Button("Add Component"))
 				{
-					// ConstructObject은 이름이 겹치면 안되므로, 간단히 카운터를 붙여서 이름을 생성합니다.
+					// ConstructObjectì€ ì´ë¦„ì´ ê²¹ì¹˜ë©´ ì•ˆë˜ë¯€ë¡œ, ê°„ë‹¨ížˆ ì¹´ìš´í„°ë¥¼ ë¶™ì—¬ì„œ ì´ë¦„ì„ ìƒì„±í•©ë‹ˆë‹¤.
 					static uint32 AddCount = 0;
 					++AddCount;
 
@@ -227,7 +227,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 				{
 					USceneComponent* SceneComp = static_cast<USceneComponent*>(SelectedComponent);
 					
-					// ─── Transform ───
+					// â”€â”€â”€ Transform â”€â”€â”€
 					if (ImGui::CollapsingHeader("##Transform", ImGuiTreeNodeFlags_DefaultOpen))
 					{
 						ImGui::SameLine(); ImGui::Text("Transform");
@@ -270,7 +270,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 					ImGui::Separator();
 				}
 				
-				// ─── UBillboardComponent ───
+				// â”€â”€â”€ UBillboardComponent â”€â”€â”€
 				if (SelectedComponent->IsA(UBillboardComponent::StaticClass())
 					&& !SelectedComponent->IsA(USubUVComponent::StaticClass()))
 				{
@@ -285,8 +285,9 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							BillboardComp->SetBillboard(bBillboard);
 
 						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
-						FMaterial* Mat = BillboardComp->GetMaterialInstance();
-						std::string CurrentMatName = (Mat && Mat->GetMaterialTexture()) ? Mat->GetOriginName() : "None";
+						std::string CurrentMatName = BillboardComp->GetSpriteMaterialName().empty()
+							? "None"
+							: BillboardComp->GetSpriteMaterialName();
 						
 						ImGui::PushItemWidth(180.f);
 						if (ImGui::BeginCombo("Sprite", CurrentMatName.c_str()))
@@ -308,7 +309,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 
 								bool bSelected = (CurrentMatName == MatName);
 								if (ImGui::Selectable(MatName.c_str(), bSelected))
-									BillboardComp->SetSpriteTexture(ListMaterial->GetMaterialTexture());
+									BillboardComp->SetSpriteMaterial(MatName);
 								if (bSelected) ImGui::SetItemDefaultFocus();
 								ImGui::PopID();
 							}
@@ -325,7 +326,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 					}
 				}
 
-				// ─── USubUVComponent ───
+				// â”€â”€â”€ USubUVComponent â”€â”€â”€
 				else if (SelectedComponent->IsA(USubUVComponent::StaticClass()))
 				{
 					USubUVComponent* SubUVComp = static_cast<USubUVComponent*>(SelectedComponent);
@@ -340,7 +341,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 					}
 				}
 
-				// ─── UTextRenderComponent ───
+				// â”€â”€â”€ UTextRenderComponent â”€â”€â”€
 				else if (SelectedComponent->IsA(UTextRenderComponent::StaticClass())
 					&& !SelectedComponent->IsA(UUUIDBillboardComponent::StaticClass()))
 				{
@@ -356,7 +357,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 					}
 				}
 
-				// ─── UStaticMeshComponent ───
+				// â”€â”€â”€ UStaticMeshComponent â”€â”€â”€
 				else if (SelectedComponent->IsA(UStaticMeshComponent::StaticClass()))
 				{
 					UStaticMeshComponent* MeshComp = static_cast<UStaticMeshComponent*>(SelectedComponent);
@@ -396,7 +397,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
 							uint32 NumSections = MeshData->GetNumSections();
 
-							// 전체 일괄 변경
+							// ì „ì²´ ì¼ê´„ ë³€ê²½
 							ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.8f, 1.0f, 1.0f));
 							ImGui::Text("Apply to All Sections:");
 							ImGui::PopStyleColor();
@@ -423,7 +424,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							}
 							ImGui::PopItemWidth();
 
-							// UV 스크롤 전체
+							// UV ìŠ¤í¬ë¡¤ ì „ì²´
 							float MasterScroll[4] = {};
 							if (NumSections > 0)
 								if (auto FirstMat = MeshComp->GetMaterial(0))
@@ -438,7 +439,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 							ImGui::Separator();
 							ImGui::Spacing();
 
-							// 섹션별
+							// ì„¹ì…˜ë³„
 							for (uint32 i = 0; i < NumSections; ++i)
 							{
 								auto CurrentMat = MeshComp->GetMaterial(i);
@@ -509,7 +510,7 @@ void FPropertyWindow::DrawComponentTree(USceneComponent *Comp, int Depth)
 	if (!Comp)
 		return;
 
-	/** UUID 는 수정 대상 X */
+	/** UUID ëŠ” ìˆ˜ì • ëŒ€ìƒ X */
 	if (Comp->IsA(UUUIDBillboardComponent::StaticClass()))
 		return;
 
@@ -534,7 +535,7 @@ void FPropertyWindow::DrawComponentTree(USceneComponent *Comp, int Depth)
 	if (!bHasChildren)
 		Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-	// Root 표시
+	// Root í‘œì‹œ
 	if (Depth == 0)
 	{
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.3f, 1.0f));
@@ -564,7 +565,7 @@ void FPropertyWindow::DrawComponentTree(USceneComponent *Comp, int Depth)
 
 	if (ImGui::BeginPopupContextItem("##CompContext"))
 	{
-		if (ImGui::MenuItem("Delete") && Depth > 0) // Root는 삭제 못하게
+		if (ImGui::MenuItem("Delete") && Depth > 0) // RootëŠ” ì‚­ì œ ëª»í•˜ê²Œ
 		{
 			PendingRemove = Comp;
 		}

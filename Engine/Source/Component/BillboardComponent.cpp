@@ -5,6 +5,7 @@
 #include "Renderer/MaterialManager.h"
 #include "Object/Object.h"
 #include "Object/Class.h"
+#include "Serializer/Archive.h"
 
 IMPLEMENT_RTTI(UBillboardComponent, UPrimitiveComponent)
 
@@ -15,6 +16,21 @@ void UBillboardComponent::PostConstruct()
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
 	MaterialInstance = FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial();
+}
+
+void UBillboardComponent::Serialize(FArchive& Ar)
+{
+	UPrimitiveComponent::Serialize(Ar);
+
+	Ar.Serialize("Size", Size);
+	Ar.Serialize("Billboard", bBillboard);
+	Ar.Serialize("EditorOnly", bEditorOnly);
+	Ar.Serialize("SpriteMaterial", SpriteMaterialName);
+
+	if (Ar.IsLoading() && !SpriteMaterialName.empty())
+	{
+		SetSpriteMaterial(SpriteMaterialName);
+	}
 }
 
 FBoxSphereBounds UBillboardComponent::GetWorldBounds() const
@@ -41,6 +57,33 @@ void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InT
 	{
 		MaterialInstance->SetMaterialTexture(InTexture);
 	}
+}
+
+bool UBillboardComponent::SetSpriteMaterial(const FString& MaterialName)
+{
+	const std::shared_ptr<FMaterial> Material = FMaterialManager::Get().FindByName(MaterialName);
+	if (!Material || !Material->GetMaterialTexture())
+	{
+		return false;
+	}
+
+	if (!MaterialInstance)
+	{
+		const std::shared_ptr<FMaterial> DefaultMaterial = FMaterialManager::Get().FindByName("M_Default_Texture");
+		if (DefaultMaterial)
+		{
+			MaterialInstance = DefaultMaterial->CreateDynamicMaterial();
+		}
+	}
+
+	if (!MaterialInstance)
+	{
+		return false;
+	}
+
+	MaterialInstance->SetMaterialTexture(Material->GetMaterialTexture());
+	SpriteMaterialName = Material->GetOriginName();
+	return true;
 }
 
 void UBillboardComponent::ResetMaterial(const FString& MaterialName)
