@@ -197,7 +197,9 @@ void AActor::Serialize(FArchive& Ar)
 				FArchive* ComponentArchive = new FArchive(true);
 				
 				FString ComponentClassName = Component->GetClass()->GetName();
+				FString ComponentName = Component->GetName();
 				ComponentArchive->Serialize("Class", ComponentClassName);
+				ComponentArchive->Serialize("Name", ComponentName);
 
 				Component->Serialize(*ComponentArchive);
 				ComponentArchives.push_back(ComponentArchive);
@@ -227,6 +229,7 @@ void AActor::Serialize(FArchive& Ar)
 		}
 
 		uint32 SavedRootCompUUID = 0;
+		TMap<USceneComponent*, uint32> SavedAttachParents;
 		if (Ar.Contains("RootComponentUUID"))
 		{
 			Ar.Serialize("RootComponentUUID", SavedRootCompUUID);
@@ -236,32 +239,90 @@ void AActor::Serialize(FArchive& Ar)
 		{
 			TArray<FArchive*> ComponentArchives;
 			Ar.Serialize("Components", ComponentArchives);
+			TArray<UActorComponent*> MatchedComponents;
 
 			for (FArchive* ComponentArchive: ComponentArchives)
 			{
 				if (ComponentArchive->Contains("Class"))
 				{
 					FString ComponentClassName;
+					FString ComponentName;
+					uint32 ComponentUUID = 0;
+					uint32 SavedAttachParentUUID = 0;
 					ComponentArchive->Serialize("Class", ComponentClassName);
+					if (ComponentArchive->Contains("Name"))
+					{
+						ComponentArchive->Serialize("Name", ComponentName);
+					}
+					if (ComponentArchive->Contains("UUID"))
+					{
+						ComponentArchive->Serialize("UUID", ComponentUUID);
+					}
+					if (ComponentArchive->Contains("AttachParentUUID"))
+					{
+						ComponentArchive->Serialize("AttachParentUUID", SavedAttachParentUUID);
+					}
 
 					
 					UClass* ComponentClass = UClass::FindClass(ComponentClassName);
 					if (ComponentClass)
 					{
 						UActorComponent* TargetComponent = nullptr;
-
-						for (UActorComponent* ExistingComponent : OwnedComponents)
+						auto IsMatched = [&MatchedComponents](UActorComponent* Component)
 						{
-							if (ExistingComponent->GetClass() == ComponentClass)
+							return std::find(MatchedComponents.begin(), MatchedComponents.end(), Component) != MatchedComponents.end();
+						};
+
+						if (ComponentUUID != 0)
+						{
+							for (UActorComponent* ExistingComponent : OwnedComponents)
 							{
-								TargetComponent = ExistingComponent;
-								break;
+								if (ExistingComponent && ExistingComponent->UUID == ComponentUUID)
+								{
+									TargetComponent = ExistingComponent;
+									break;
+								}
+							}
+						}
+
+						if (!TargetComponent && !ComponentName.empty())
+						{
+							for (UActorComponent* ExistingComponent : OwnedComponents)
+							{
+								if (ExistingComponent == nullptr || IsMatched(ExistingComponent))
+								{
+									continue;
+								}
+
+								if (ExistingComponent->GetClass() == ComponentClass && ExistingComponent->GetName() == ComponentName)
+								{
+									TargetComponent = ExistingComponent;
+									break;
+								}
 							}
 						}
 
 						if (!TargetComponent)
 						{
-							UObject* NewObject = FObjectFactory::ConstructObject(ComponentClass, this);
+							for (UActorComponent* ExistingComponent : OwnedComponents)
+							{
+								if (ExistingComponent == nullptr || IsMatched(ExistingComponent))
+								{
+									continue;
+								}
+
+								if (ExistingComponent->GetClass() == ComponentClass)
+								{
+									TargetComponent = ExistingComponent;
+									break;
+								}
+							}
+						}
+
+						if (!TargetComponent)
+						{
+							const FString NewComponentName = ComponentName.empty() ? ComponentClassName : ComponentName;
+							UObject* NewObject = FObjectFactory::ConstructObject(ComponentClass, this, NewComponentName);
 							TargetComponent = static_cast<UActorComponent*>(NewObject);
 
 							if (TargetComponent)
@@ -273,6 +334,12 @@ void AActor::Serialize(FArchive& Ar)
 						if (TargetComponent)
 						{
 							TargetComponent->Serialize(*ComponentArchive);
+							MatchedComponents.push_back(TargetComponent);
+
+							if (TargetComponent->IsA(USceneComponent::StaticClass()))
+							{
+								SavedAttachParents[static_cast<USceneComponent*>(TargetComponent)] = SavedAttachParentUUID;
+							}
 						}
 					}
 					else
@@ -295,15 +362,56 @@ void AActor::Serialize(FArchive& Ar)
 				}
 			}
 		}
-		if (RootComponent)
+
+		TMap<uint32, USceneComponent*> SceneComponentByUUID;
+		for (UActorComponent* Comp : OwnedComponents)
 		{
-			for (UActorComponent* Comp : OwnedComponents)
+			if (Comp && Comp->IsA(USceneComponent::StaticClass()))
 			{
-				if (Comp != RootComponent && Comp->IsA(USceneComponent::StaticClass()))
+				USceneComponent* SceneComp = static_cast<USceneComponent*>(Comp);
+				SceneComp->DetachFromParent();
+				SceneComponentByUUID[SceneComp->UUID] = SceneComp;
+			}
+		}
+
+		for (const auto& [SceneComp, ParentUUID] : SavedAttachParents)
+		{
+			if (SceneComp == nullptr || SceneComp == RootComponent)
+			{
+				continue;
+			}
+
+			USceneComponent* ParentComponent = nullptr;
+			if (ParentUUID != 0)
+			{
+				auto FoundParent = SceneComponentByUUID.find(ParentUUID);
+				if (FoundParent != SceneComponentByUUID.end())
 				{
-					USceneComponent* LevelComp = static_cast<USceneComponent*>(Comp);
-					LevelComp->AttachTo(RootComponent);
+					ParentComponent = FoundParent->second;
 				}
+			}
+
+			if (ParentComponent == nullptr && RootComponent && SceneComp != RootComponent)
+			{
+				ParentComponent = RootComponent;
+			}
+
+			if (ParentComponent && ParentComponent != SceneComp)
+			{
+				SceneComp->AttachTo(ParentComponent);
+			}
+		}
+
+		for (UActorComponent* Component : OwnedComponents)
+		{
+			if (Component && !Component->IsRegistered())
+			{
+				Component->OnRegister();
+			}
+
+			if (UPrimitiveComponent* PrimComp = dynamic_cast<UPrimitiveComponent*>(Component))
+			{
+				PrimComp->UpdateBounds();
 			}
 		}
 	}

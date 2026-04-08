@@ -63,10 +63,12 @@ void USceneComponent::Serialize(FArchive& Ar)
 
 	if (Ar.IsSaving())
 	{
+		uint32 AttachParentUUID = AttachParent ? AttachParent->UUID : 0;
 		FVector Location = RelativeTransform.GetTranslation();
 		FVector Rotation = RelativeTransform.Rotator().Euler();
 		FVector Scale = RelativeTransform.GetScale3D();
 
+		Ar.Serialize("AttachParentUUID", AttachParentUUID);
 		Ar.Serialize("Location", Location);
 		Ar.Serialize("Rotation", Rotation);
 		Ar.Serialize("Scale", Scale);
