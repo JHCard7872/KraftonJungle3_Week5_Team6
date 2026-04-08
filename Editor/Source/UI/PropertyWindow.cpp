@@ -10,6 +10,7 @@
 #include "Renderer/RenderMesh.h"
 #include "Renderer/Material.h"
 #include "Renderer/MaterialManager.h"
+#include "Component/BillboardComponent.h"
 
 void FPropertyWindow::SetTarget(const FVector& Location, const FVector& Rotation,
                                 const FVector& Scale, const char* ActorName)
@@ -157,6 +158,68 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 						if (ImGui::Checkbox("Text Billboard", &bBillboard))
 							TextComp->SetBillboard(bBillboard);
 					}
+					else if (Component->IsA(UBillboardComponent::StaticClass()))
+					{
+						UBillboardComponent* BillboardComp = static_cast<UBillboardComponent*>(Component);
+
+						ImGui::Separator();
+						ImGui::Text("Billboard Sprite");
+
+						bool bBillboard = BillboardComp->IsBillboard();
+						if (ImGui::Checkbox("Billboard##BillboardComp", &bBillboard))
+							BillboardComp->SetBillboard(bBillboard);
+
+						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
+						FDynamicMaterial* Mat = BillboardComp->GetMaterialInstance();
+						std::string CurrentMatName = Mat ? Mat->GetOriginName() : "None";
+
+						ImGui::PushItemWidth(180.f);
+						if (ImGui::BeginCombo("Sprite##BillboardSprite", CurrentMatName.c_str()))
+						{
+							for (const FString& MatName : MatNames)
+							{
+								ImGui::PushID(MatName.c_str());
+
+								auto ListMaterial = FMaterialManager::Get().FindByName(MatName);
+
+
+								ImTextureID TexID = (ImTextureID)0;
+								if (ListMaterial && ListMaterial->GetMaterialTexture()
+									&& ListMaterial->GetMaterialTexture()->TextureSRV)
+								{
+									TexID = (ImTextureID)ListMaterial->GetMaterialTexture()->TextureSRV;
+								}
+
+								if (TexID)
+								{
+									ImGui::Image(TexID, ImVec2(24.0f, 24.0f));
+									ImGui::SameLine();
+									ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
+								}
+								else
+								{
+									ImGui::PopID();
+									continue;
+								}
+
+								bool bSelected = (CurrentMatName == MatName);
+								if (ImGui::Selectable(MatName.c_str(), bSelected))
+								{
+									if (ListMaterial && ListMaterial->GetMaterialTexture())
+										BillboardComp->SetSpriteTexture(ListMaterial->GetMaterialTexture());
+								}
+								if (bSelected) ImGui::SetItemDefaultFocus();
+								ImGui::PopID();
+							}
+							ImGui::EndCombo();
+						}
+						ImGui::PopItemWidth();
+
+						FVector2 Size = BillboardComp->GetSize();
+						float SizeArr[2] = { Size.X, Size.Y };
+						if (ImGui::DragFloat2("Size##BillboardSize", SizeArr, 0.01f, 0.01f, 100.f, "%.2f"))
+							BillboardComp->SetSize(FVector2(SizeArr[0], SizeArr[1]));
+					}					
 				}
 				ImGui::Unindent(8.0f);
 			}

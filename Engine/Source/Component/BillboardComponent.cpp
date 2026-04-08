@@ -36,6 +36,14 @@ FRenderMesh* UBillboardComponent::GetRenderMesh() const
 	return BillboardMesh.get();
 }
 
+void UBillboardComponent::SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture)
+{
+	if (MaterialInstance)
+	{
+		MaterialInstance->SetMaterialTexture(InTexture);
+	}
+}
+
 void UBillboardComponent::CopyPropertiesFrom(const UObject* Source)
 {
 	UPrimitiveComponent::CopyPropertiesFrom(Source);

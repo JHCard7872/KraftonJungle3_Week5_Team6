@@ -2,8 +2,10 @@
 #include "CoreMinimal.h"
 #include "Component/PrimitiveComponent.h"
 
+
 struct FDynamicMesh;
 class FDynamicMaterial;
+struct FMaterialTexture;
 
 class ENGINE_API UBillboardComponent : public UPrimitiveComponent
 {
@@ -24,6 +26,8 @@ public:
 	virtual FRenderMesh* GetRenderMesh() const override;
 	FDynamicMesh* GetBillboardMesh() const { return BillboardMesh.get(); }
 	FDynamicMaterial* GetMaterialInstance() const { return MaterialInstance.get(); }
+
+	void SetSpriteTexture(std::shared_ptr<FMaterialTexture> InTexture);
 
 protected:
 	void CopyPropertiesFrom(const UObject* Source) override;
