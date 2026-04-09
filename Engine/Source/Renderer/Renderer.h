@@ -133,6 +133,8 @@ public:
 	ID3D11ShaderResourceView* GetFolderIconSRV() const { return FolderIconSRV; }
 	ID3D11ShaderResourceView* GetFileIconSRV() const { return FileIconSRV; }
 
+	const TArray<FString>& GetEditorIconNames() const { return EditorIconNames; }
+
 private:
 	/** 프레임/오브젝트 상수 버퍼를 셰이더 슬롯에 연결한다. */
 	void SetConstantBuffers();
@@ -232,6 +234,8 @@ private:
 
 	/** SubUV, Text 등 텍스처 샘플링이 필요한 패스에서 사용하는 기본 샘플러다. */
 	ID3D11SamplerState* NormalSampler = nullptr;
+
+	TArray<FString> EditorIconNames;
 
 public:
 	FShaderManager ShaderManager;
