@@ -25,21 +25,7 @@ void ACameraActor::PostSpawnInitialize()
 	IconBillboard->SetSize(FVector2(0.5f, 0.5f));
 	IconBillboard->SetEditorOnly(true);
 	IconBillboard->ResetMaterial("M_BillboardIcon");
-
-	if (GEngine)
-	{
-		if (FRenderer* Renderer = GEngine->GetRenderer())
-		{
-			std::filesystem::path TexPath = FPaths::ProjectRoot() / "Editor/Icon/PlayWorld.png";
-			ID3D11ShaderResourceView* SRV = nullptr;
-			if (Renderer->CreateTextureFromSTB(Renderer->GetDevice(), TexPath, &SRV))
-			{
-				auto MatTex = std::make_shared<FMaterialTexture>();
-				MatTex->TextureSRV = SRV;
-				IconBillboard->SetSpriteTexture(MatTex);
-			}
-		}
-	}
+	IconBillboard->SetSpriteMaterial("PlayWorld");
 
 	constexpr float ArrowScale = 0.02f;
 	FTransform ArrowTransform;

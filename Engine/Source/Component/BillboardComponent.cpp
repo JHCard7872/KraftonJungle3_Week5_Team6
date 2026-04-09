@@ -16,6 +16,7 @@ void UBillboardComponent::PostConstruct()
 	BillboardMesh = std::make_shared<FDynamicMesh>();
 
 	MaterialInstance = FMaterialManager::Get().FindByName("M_Default_Texture")->CreateDynamicMaterial();
+	SetSpriteMaterial("Pawn_64x");
 }
 
 void UBillboardComponent::Serialize(FArchive& Ar)

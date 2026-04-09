@@ -284,7 +284,7 @@ void FPropertyWindow::Render(FEditorEngine* Engine)
 						if (ImGui::Checkbox("Billboard", &bBillboard))
 							BillboardComp->SetBillboard(bBillboard);
 
-						TArray<FString> MatNames = FMaterialManager::Get().GetAllMaterialNames();
+						TArray<FString> MatNames = GEngine->GetRenderer()->GetEditorIconNames();
 						std::string CurrentMatName = BillboardComp->GetSpriteMaterialName().empty()
 							? "None"
 							: BillboardComp->GetSpriteMaterialName();

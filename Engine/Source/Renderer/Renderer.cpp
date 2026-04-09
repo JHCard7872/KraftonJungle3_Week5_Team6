@@ -392,6 +392,51 @@ bool FRenderer::Initialize(HWND InHwnd, int32 Width, int32 Height)
 		}
 
 		FMaterialManager::Get().Register("M_BillboardIcon", BillboardIconMaterial);
+
+		// 에디터 아이콘들을 Billboard용 머티리얼로 등록
+		std::filesystem::path IconDirPath = FPaths::ProjectRoot() / "Editor/Icon";
+		if (std::filesystem::exists(IconDirPath))
+		{
+			for (const auto& Entry : std::filesystem::directory_iterator(IconDirPath))
+			{
+				if (Entry.is_regular_file() && Entry.path().extension() == ".png")
+				{
+					ID3D11ShaderResourceView* IconSRV = nullptr;
+					if (CreateTextureFromSTB(Device, Entry.path(), &IconSRV))
+					{
+						auto IconMaterial = std::make_shared<FMaterial>();
+						IconMaterial->SetVertexShader(VS);
+						IconMaterial->SetPixelShader(PS);
+						IconMaterial->SetRasterizerOption(BillboardIconMaterial->GetRasterizerOption());
+						IconMaterial->SetRasterizerState(BillboardIconMaterial->GetRasterizerState());
+						IconMaterial->SetDepthStencilOption(BillboardIconMaterial->GetDepthStencilOption());
+						IconMaterial->SetDepthStencilState(BillboardIconMaterial->GetDepthStencilState());
+						IconMaterial->SetBlendOption(BillboardIconMaterial->GetBlendOption());
+						IconMaterial->SetBlendState(BillboardIconMaterial->GetBlendState());
+
+						int32 IconSlotIndex = IconMaterial->CreateConstantBuffer(Device, 16);
+						if (IconSlotIndex >= 0)
+						{
+							IconMaterial->RegisterParameter("CellSize", IconSlotIndex, 0, 8);
+							IconMaterial->RegisterParameter("UVOffset", IconSlotIndex, 8, 8);
+							float CellSize[2] = { 1.0f, 1.0f };
+							float UVOffset[2] = { 0.0f, 0.0f };
+							IconMaterial->GetConstantBuffer(IconSlotIndex)->SetData(CellSize, sizeof(CellSize), 0);
+							IconMaterial->GetConstantBuffer(IconSlotIndex)->SetData(UVOffset, sizeof(UVOffset), 8);
+						}
+
+						auto MatTex = std::make_shared<FMaterialTexture>();
+						MatTex->TextureSRV = IconSRV;
+						IconMaterial->SetMaterialTexture(MatTex);
+
+						FString IconName = Entry.path().stem().string();
+						IconMaterial->SetOriginName(IconName);
+						FMaterialManager::Get().Register(IconName, IconMaterial);
+						EditorIconNames.push_back(IconName);
+					}
+				}
+			}
+		}
 	}
 
 	if (!TextRenderer.Initialize(this)) return false;
